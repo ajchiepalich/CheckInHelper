@@ -1,0 +1,10 @@
+{
+  "id": "10002",
+  "title": "System Access Requests",
+  "version": 8,
+  "spaceId": "1000",
+  "spaceKey": "IT",
+  "webUrl": "https://highlands.atlassian.net/wiki/spaces/IT/pages/10002/System+Access+Requests",
+  "updatedAt": "2026-06-15T09:00:00.000Z",
+  "bodyHtml": "<h1>System Access Requests</h1><p>Access to internal systems requires manager approval and IT Security review.</p><ul><li>Confirm your role requires the system.</li><li>Submit an access request with business justification.</li><li>Wait for provisioning confirmation.</li></ul>"
+}

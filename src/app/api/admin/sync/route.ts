@@ -1,0 +1,75 @@
+import { NextRequest, NextResponse } from "next/server";
+import { SyncTriggerType } from "@prisma/client";
+import { requireAdmin } from "@/lib/auth";
+import { getEnv } from "@/lib/env";
+import { runSynchronization } from "@/lib/sync/service";
+import { checkRateLimit, verifyCronSecret } from "@/lib/security";
+import { AuditEventType } from "@prisma/client";
+import { prisma } from "@/lib/db";
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await requireAdmin();
+    const env = getEnv();
+
+    const rate = checkRateLimit(`sync:${session.user.id}`, env.SYNC_RATE_LIMIT);
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded." },
+        { status: 429 },
+      );
+    }
+
+    const body = (await request.json().catch(() => ({}))) as {
+      sourceId?: string;
+      dryRun?: boolean;
+      retryFailedOnly?: boolean;
+    };
+
+    await prisma.auditEvent.create({
+      data: {
+        type: AuditEventType.SYNC_TRIGGERED,
+        userId: session.user.id,
+        metadata: body,
+      },
+    });
+
+    const result = await runSynchronization({
+      triggerType: body.sourceId
+        ? SyncTriggerType.SINGLE_SOURCE
+        : SyncTriggerType.MANUAL,
+      triggeredById: session.user.id,
+      sourceId: body.sourceId,
+      dryRun: body.dryRun,
+      retryFailedOnly: body.retryFailedOnly,
+    });
+
+    return NextResponse.json(result);
+  } catch (error) {
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (error instanceof Error && error.message === "Forbidden") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    return NextResponse.json(
+      { error: "Sync failed to start." },
+      { status: 500 },
+    );
+  }
+}
+
+export async function GET(request: NextRequest) {
+  const env = getEnv();
+  const authHeader = request.headers.get("authorization");
+
+  if (!verifyCronSecret(authHeader, env.CRON_SECRET)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const result = await runSynchronization({
+    triggerType: SyncTriggerType.CRON,
+  });
+
+  return NextResponse.json(result);
+}

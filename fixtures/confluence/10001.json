@@ -1,0 +1,10 @@
+{
+  "id": "10001",
+  "title": "Requesting Technology Support",
+  "version": 14,
+  "spaceId": "1000",
+  "spaceKey": "IT",
+  "webUrl": "https://highlands.atlassian.net/wiki/spaces/IT/pages/10001/Requesting+Technology+Support",
+  "updatedAt": "2026-07-01T12:00:00.000Z",
+  "bodyHtml": "<h1>Requesting Technology Support</h1><p>Staff can request technology support through the IT Service Portal.</p><ol><li>Open the IT Service Portal from the staff intranet.</li><li>Select <strong>Request Technology Support</strong>.</li><li>Describe the issue and affected systems.</li><li>Submit the request and retain your ticket number.</li></ol><p>For urgent ministry-impacting issues, follow the escalation guidance documented on this page.</p>"
+}

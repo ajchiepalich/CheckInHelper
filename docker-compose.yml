@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: highlands-docs-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: highlands
+      POSTGRES_PASSWORD: highlands_dev
+      POSTGRES_DB: highlands_docs
+    volumes:
+      - highlands_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  highlands_postgres_data:

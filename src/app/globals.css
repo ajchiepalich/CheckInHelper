@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #0b517a;
+  --color-primary-dark: #02392d;
+  --color-secondary: #297f6f;
+  --color-accent: #a4c06e;
+  --color-highlight: #ffd03b;
+  --color-gold: #f4ae34;
+  --color-error: #ce3d2d;
+  --color-muted: #5c6b73;
+  --color-surface: #ffffff;
+  --color-background: #f7f6f2;
+  --color-border: #e4e0d8;
+  --color-mint: #bae0d1;
+  --color-light-blue: #a5d7f4;
+  --color-blue: #4391ce;
+  --color-peach: #f8d1aa;
+  --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --radius-card: 1.25rem;
+  --shadow-soft: 0 10px 30px rgba(11, 81, 122, 0.08);
+}
+
+:root {
+  --gradient-brand: linear-gradient(
+    145deg,
+    #02392d 0%,
+    #297f6f 38%,
+    #bae0d1 68%,
+    #ffe183 100%
+  );
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-near-black, #1e1e1e);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.prose-highlands {
+  line-height: 1.65;
+}
+
+.prose-highlands h1,
+.prose-highlands h2,
+.prose-highlands h3 {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.prose-highlands code {
+  background: #eef5f3;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.35rem;
+  font-size: 0.9em;
+}
+
+.prose-highlands pre {
+  overflow-x: auto;
+  background: #102820;
+  color: #f7f6f2;
+  padding: 1rem;
+  border-radius: 0.75rem;
+}
+
+.prose-highlands table {
+  display: block;
+  overflow-x: auto;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.prose-highlands th,
+.prose-highlands td {
+  border: 1px solid var(--color-border);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.gradient-panel {
+  background: var(--gradient-brand);
+}
