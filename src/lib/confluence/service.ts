@@ -1,10 +1,7 @@
 import { readFile } from "fs/promises";
 import path from "path";
 import { normalizeBaseUrl } from "@/lib/confluence/parse";
-import {
-  externalPageId,
-  fetchExternalSharePage,
-} from "@/lib/confluence/external-fetch";
+import { fetchExternalSharePage } from "@/lib/confluence/external-fetch";
 import { parseExternalToken } from "@/lib/confluence/parse";
 
 export type ConfluencePage = {

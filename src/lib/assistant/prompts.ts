@@ -33,7 +33,7 @@ const SOURCE_ATTRIBUTION_SENTENCE =
   /^(this information comes from|according to|based on (?:the )?(?:approved )?|the (?:information|details|answer) (?:above )?(?:comes|is) from|this (?:answer )?(?:is )?based on|the source(?:s)? (?:for this )?(?:is|are))/i;
 
 export function stripSourceAttributionFromAnswer(text: string): string {
-  let paragraphs = text.trimEnd().split(/\n\n+/);
+  const paragraphs = text.trimEnd().split(/\n\n+/);
   if (paragraphs.length === 0) return text;
 
   let changed = true;
