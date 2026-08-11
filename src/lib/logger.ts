@@ -69,10 +69,6 @@ export function getDiagnosticsSummary(): Record<string, unknown> {
     localAuth: process.env.LOCAL_AUTH_ENABLED === "true",
     hasOpenAiKey: Boolean(process.env.OPENAI_API_KEY),
     hasVectorStore: Boolean(process.env.OPENAI_VECTOR_STORE_ID),
-    hasConfluence: Boolean(
-      process.env.ATLASSIAN_BASE_URL &&
-      process.env.ATLASSIAN_USER_EMAIL &&
-      process.env.ATLASSIAN_API_TOKEN,
-    ),
+    hasConfluence: Boolean(process.env.ATLASSIAN_BASE_URL),
   };
 }

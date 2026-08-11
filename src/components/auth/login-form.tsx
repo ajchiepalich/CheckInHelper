@@ -58,9 +58,9 @@ export function LoginForm({
           {localAuthEnabled ? (
             <form
               onSubmit={handleLocalSignIn}
-              className="space-y-4 rounded-2xl border border-dashed border-[var(--color-gold)] bg-[#fff8e8] p-4"
+              className="space-y-4 rounded-2xl border border-dashed border-[var(--color-gold)] bg-[var(--color-warning-bg)] p-4"
             >
-              <p className="text-sm font-semibold text-[#6e5530]">
+              <p className="text-sm font-semibold text-[var(--color-warning-text)]">
                 Local development authentication
               </p>
               <div className="space-y-2">

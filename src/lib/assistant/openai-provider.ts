@@ -2,30 +2,25 @@ import OpenAI from "openai";
 import { prisma } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import {
+  buildRetrievalDiagnostics,
+  buildSourceFileMap,
+  extractCitedFilesFromAnnotations,
+  extractRetrievalResultsFromOutput,
+  mapSupportingCitations,
+  shouldIncludeCitations,
+} from "@/lib/assistant/citations";
+import {
   DEFAULT_RESPONSE_MAX_OUTPUT_TOKENS,
   NO_SOURCE_FALLBACK,
+  stripSourceAttributionFromAnswer,
   SYSTEM_PROMPT,
 } from "@/lib/assistant/prompts";
 import type {
-  MappedCitation,
   RetrievalChatRequest,
   RetrievalProvider,
   RetrievalStreamEvent,
 } from "@/lib/assistant/provider";
 import { logError, logInfo } from "@/lib/logger";
-
-function mapFileToCitation(
-  fileId: string,
-  sourceMap: Map<string, MappedCitation>,
-): MappedCitation {
-  const mapped = sourceMap.get(fileId);
-  if (mapped) return mapped;
-  return {
-    openaiFileId: fileId,
-    title: "Documentation source",
-    sourceUrl: "#",
-  };
-}
 
 export class OpenAIRetrievalProvider implements RetrievalProvider {
   private client: OpenAI;
@@ -57,23 +52,12 @@ export class OpenAIRetrievalProvider implements RetrievalProvider {
         confluencePageId: true,
         spaceKey: true,
         lastKnownUpdatedAt: true,
+        lastKnownVersion: true,
         openaiFileId: true,
       },
     });
 
-    const sourceMap = new Map<string, MappedCitation>();
-    for (const source of sources) {
-      if (!source.openaiFileId) continue;
-      sourceMap.set(source.openaiFileId, {
-        openaiFileId: source.openaiFileId,
-        title: source.title,
-        sourceUrl: source.sourceUrl,
-        confluencePageId: source.confluencePageId,
-        spaceKey: source.spaceKey ?? undefined,
-        confluenceUpdatedAt: source.lastKnownUpdatedAt?.toISOString(),
-        knowledgeSourceId: source.id,
-      });
-    }
+    const sourceMap = buildSourceFileMap(sources);
 
     const input = request.messages.map((m) => ({
       role: m.role,
@@ -101,7 +85,9 @@ export class OpenAIRetrievalProvider implements RetrievalProvider {
       let text = "";
       let openaiResponseId: string | undefined;
       let retrievalCount = 0;
-      const citationFileIds = new Set<string>();
+      const citedFiles = new Map<string, { fileId: string; snippet?: string }>();
+      let retrievalResults: ReturnType<typeof extractRetrievalResultsFromOutput> =
+        [];
 
       for await (const event of stream) {
         if (event.type === "response.created") {
@@ -120,24 +106,28 @@ export class OpenAIRetrievalProvider implements RetrievalProvider {
         if (event.type === "response.content_part.done") {
           const part = event.part;
           if (part.type === "output_text" && part.annotations) {
-            for (const annotation of part.annotations) {
-              if (annotation.type === "file_citation") {
-                citationFileIds.add(annotation.file_id);
-              }
+            for (const cited of extractCitedFilesFromAnnotations(
+              part.annotations,
+            )) {
+              citedFiles.set(cited.fileId, cited);
             }
           }
         }
 
         if (event.type === "response.completed") {
           openaiResponseId = event.response.id;
+          retrievalResults = extractRetrievalResultsFromOutput(
+            event.response.output,
+          );
+
           for (const item of event.response.output ?? []) {
             if (item.type === "message") {
               for (const content of item.content ?? []) {
                 if (content.type === "output_text") {
-                  for (const annotation of content.annotations ?? []) {
-                    if (annotation.type === "file_citation") {
-                      citationFileIds.add(annotation.file_id);
-                    }
+                  for (const cited of extractCitedFilesFromAnnotations(
+                    content.annotations ?? [],
+                  )) {
+                    citedFiles.set(cited.fileId, cited);
                   }
                 }
               }
@@ -151,9 +141,20 @@ export class OpenAIRetrievalProvider implements RetrievalProvider {
         yield { type: "delta", text };
       }
 
-      const citations = Array.from(citationFileIds).map((fileId) =>
-        mapFileToCitation(fileId, sourceMap),
+      text = stripSourceAttributionFromAnswer(text);
+
+      const supportingCitations = shouldIncludeCitations(
+        text,
+        mapSupportingCitations(Array.from(citedFiles.values()), sourceMap),
       );
+
+      const diagnostics = buildRetrievalDiagnostics({
+        traceId: request.traceId,
+        openaiResponseId,
+        retrievalResults,
+        citedFiles: Array.from(citedFiles.values()),
+        supportingCitations,
+      });
 
       const latencyMs = Date.now() - started;
 
@@ -163,7 +164,10 @@ export class OpenAIRetrievalProvider implements RetrievalProvider {
         openaiRequestId: openaiResponseId,
         latencyMs,
         retrievalCount,
-        citationCount: citations.length,
+        citationCount: supportingCitations.length,
+        retrievedFileIds: diagnostics.retrievedFileIds,
+        citedFileIds: diagnostics.citedFileIds,
+        supportingSourceIds: diagnostics.supportingSourceIds,
       });
 
       yield {
@@ -173,7 +177,8 @@ export class OpenAIRetrievalProvider implements RetrievalProvider {
         model: this.model,
         latencyMs,
         retrievalCount,
-        citations,
+        citations: supportingCitations,
+        diagnostics,
       };
     } catch (error) {
       logError("chat.response.failed", error, {

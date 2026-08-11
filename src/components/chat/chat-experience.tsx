@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   Loader2,
   Send,
-  Sparkles,
   ThumbsDown,
   ThumbsUp,
   TriangleAlert,
@@ -29,8 +28,10 @@ type ChatMessage = {
 
 export function ChatExperience({
   initialConversationId,
+  embedded = false,
 }: {
   initialConversationId?: string;
+  embedded?: boolean;
 }) {
   const [conversationId, setConversationId] = useState<string | undefined>(
     initialConversationId,
@@ -189,36 +190,38 @@ export function ChatExperience({
 
   const showEmptyState = messages.length === 0;
 
-  return (
-    <AppShell
-      title="Staff documentation chat"
-      subtitle="Answers come from approved Highlands Confluence documentation."
+  const chatContent = (
+    <div
+      className={
+        embedded
+          ? "mx-auto flex h-full min-h-[100dvh] max-w-4xl flex-col px-4 py-4"
+          : "grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]"
+      }
     >
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <section
-          aria-label="Conversation"
-          className="flex min-h-[70vh] flex-col"
-        >
+      <section
+        aria-label="Conversation"
+        className={embedded ? "flex flex-1 flex-col" : "flex min-h-[70vh] flex-col"}
+      >
+        {!embedded ? (
           <div className="mb-4 flex justify-end">
             <Button variant="outline" onClick={startNewConversation}>
               New conversation
             </Button>
           </div>
+        ) : null}
 
-          {showEmptyState ? (
+        {showEmptyState ? (
+          <div
+            className={
+              embedded
+                ? "flex flex-1 flex-col justify-center"
+                : undefined
+            }
+          >
             <div className="gradient-panel rounded-[1.75rem] p-8 text-white shadow-[var(--shadow-soft)] md:p-10">
-              <div className="flex items-center gap-2 text-sm tracking-[0.18em] text-white/80 uppercase">
-                <Sparkles className="h-4 w-4" aria-hidden="true" />
-                Approved documentation
-              </div>
-              <h3 className="mt-4 text-4xl font-bold md:text-5xl">
+              <h3 className="text-4xl font-bold md:text-5xl">
                 How can I help?
               </h3>
-              <p className="mt-4 max-w-2xl text-lg text-white/90">
-                Ask about internal processes, systems, and policies. I answer
-                using approved Highlands documentation and cite the original
-                Confluence sources.
-              </p>
               <div className="mt-8 grid gap-3 md:grid-cols-2">
                 {SUGGESTED_PROMPTS.map((prompt) => (
                   <button
@@ -232,7 +235,8 @@ export function ChatExperience({
                 ))}
               </div>
             </div>
-          ) : (
+          </div>
+        ) : (
             <div className="flex-1 space-y-6">
               {messages.map((message) => (
                 <article
@@ -244,7 +248,7 @@ export function ChatExperience({
                   }
                   className={
                     message.role === "user"
-                      ? "ml-auto max-w-3xl rounded-2xl bg-white px-5 py-4 shadow-[var(--shadow-soft)]"
+                      ? "ml-auto max-w-3xl rounded-2xl bg-[var(--color-surface)] px-5 py-4 shadow-[var(--shadow-soft)]"
                       : "max-w-4xl"
                   }
                 >
@@ -256,7 +260,7 @@ export function ChatExperience({
                   {message.role === "assistant" ? (
                     <MarkdownContent content={message.content || "…"} />
                   ) : (
-                    <p className="whitespace-pre-wrap text-[#1e1e1e]">
+                    <p className="whitespace-pre-wrap text-[var(--color-foreground)]">
                       {message.content}
                     </p>
                   )}
@@ -329,13 +333,13 @@ export function ChatExperience({
           ) : null}
 
           {error ? (
-            <Card className="mt-4 border-[var(--color-error)] bg-[#fdecea] p-4 text-sm text-[var(--color-error)]">
+            <Card className="mt-4 border-[var(--color-error)] bg-[var(--color-error-bg)] p-4 text-sm text-[var(--color-error)]">
               {error}
             </Card>
           ) : null}
 
           <form
-            className="sticky bottom-0 mt-6 rounded-[1.5rem] border border-[var(--color-border)] bg-white p-4 shadow-[var(--shadow-soft)]"
+            className="sticky bottom-0 mt-6 rounded-[1.5rem] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-soft)]"
             onSubmit={(e) => {
               e.preventDefault();
               sendMessage(input);
@@ -378,36 +382,54 @@ export function ChatExperience({
           </form>
         </section>
 
-        <aside aria-label="Selected source details" className="hidden lg:block">
-          <Card className="sticky top-6 p-6">
-            <h3 className="text-lg font-semibold text-[var(--color-primary)]">
-              Source details
-            </h3>
-            {selectedCitation ? (
-              <div className="mt-4 space-y-3 text-sm">
-                <p className="font-semibold">{selectedCitation.title}</p>
-                <p className="text-[var(--color-muted)]">
-                  {selectedCitation.spaceKey
-                    ? `Space ${selectedCitation.spaceKey}`
-                    : "Confluence source"}
+        {!embedded ? (
+          <aside aria-label="Selected source details" className="hidden lg:block">
+            <Card className="sticky top-6 p-6">
+              <h3 className="text-lg font-semibold text-[var(--color-primary)]">
+                Source details
+              </h3>
+              {selectedCitation ? (
+                <div className="mt-4 space-y-3 text-sm">
+                  <p className="font-semibold">{selectedCitation.title}</p>
+                  <p className="text-[var(--color-muted)]">
+                    {selectedCitation.spaceKey
+                      ? `Space ${selectedCitation.spaceKey}`
+                      : "Confluence source"}
+                  </p>
+                  <a
+                    href={selectedCitation.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex font-medium text-[var(--color-secondary)] underline"
+                  >
+                    Open in Confluence
+                  </a>
+                </div>
+              ) : (
+                <p className="mt-4 text-sm text-[var(--color-muted)]">
+                  Select a citation to preview the source details here.
                 </p>
-                <a
-                  href={selectedCitation.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex font-medium text-[var(--color-secondary)] underline"
-                >
-                  Open in Confluence
-                </a>
-              </div>
-            ) : (
-              <p className="mt-4 text-sm text-[var(--color-muted)]">
-                Select a citation to preview the source details here.
-              </p>
-            )}
-          </Card>
-        </aside>
+              )}
+            </Card>
+          </aside>
+        ) : null}
       </div>
+  );
+
+  if (embedded) {
+    return (
+      <div className="min-h-[100dvh] bg-[var(--color-background)]">
+        {chatContent}
+      </div>
+    );
+  }
+
+  return (
+    <AppShell
+      title="Staff documentation chat"
+      subtitle="Answers come from approved Highlands Confluence documentation."
+    >
+      {chatContent}
     </AppShell>
   );
 }

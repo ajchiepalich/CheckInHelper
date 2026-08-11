@@ -145,16 +145,17 @@ model Conversation {
   @@index([userId, updatedAt(sort: Desc)])
 }
 
-model Message {
-  id               String   @id @default(cuid())
-  conversationId   String
-  role             String
-  content          String   @db.Text
-  openaiResponseId String?
-  model            String?
-  latencyMs        Int?
-  retrievalCount   Int      @default(0)
-  createdAt        DateTime @default(now())
+  model Message {
+  id                   String   @id @default(cuid())
+  conversationId       String
+  role                 String
+  content              String   @db.Text
+  openaiResponseId     String?
+  model                String?
+  latencyMs            Int?
+  retrievalCount       Int      @default(0)
+  retrievalDiagnostics Json?
+  createdAt            DateTime @default(now())
 
   conversation Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   citations    MessageCitation[]
@@ -164,16 +165,18 @@ model Message {
 }
 
 model MessageCitation {
-  id                 String   @id @default(cuid())
-  messageId          String
-  knowledgeSourceId  String?
-  openaiFileId       String?
-  title              String
-  sourceUrl          String
-  confluencePageId   String?
-  spaceKey           String?
+  id                  String   @id @default(cuid())
+  messageId           String
+  knowledgeSourceId   String?
+  openaiFileId        String?
+  title               String
+  sourceUrl           String
+  confluencePageId    String?
+  confluenceVersion   Int?
+  spaceKey            String?
   confluenceUpdatedAt DateTime?
-  createdAt          DateTime @default(now())
+  snippet             String?  @db.Text
+  createdAt           DateTime @default(now())
 
   message         Message          @relation(fields: [messageId], references: [id], onDelete: Cascade)
   knowledgeSource KnowledgeSource? @relation(fields: [knowledgeSourceId], references: [id], onDelete: SetNull)

@@ -3,10 +3,14 @@ export type MappedCitation = {
   title: string;
   sourceUrl: string;
   confluencePageId?: string;
+  confluenceVersion?: number;
   spaceKey?: string;
   confluenceUpdatedAt?: string;
   knowledgeSourceId?: string;
+  snippet?: string;
 };
+
+export type RetrievalDiagnostics = import("@/lib/assistant/citations").RetrievalDiagnostics;
 
 export type ChatMessageInput = {
   role: "user" | "assistant";
@@ -33,6 +37,7 @@ export type RetrievalStreamEvent =
       latencyMs: number;
       retrievalCount: number;
       citations: MappedCitation[];
+      diagnostics?: RetrievalDiagnostics;
     }
   | { type: "error"; message: string };
 

@@ -8,7 +8,7 @@ export const Input = React.forwardRef<
   <input
     type={type}
     className={cn(
-      "flex h-11 w-full rounded-xl border border-[var(--color-border)] bg-white px-4 py-2 text-sm text-[#1e1e1e] placeholder:text-[var(--color-muted)] focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+      "flex h-11 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm text-[var(--color-foreground)] placeholder:text-[var(--color-muted)] focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
       className,
     )}
     ref={ref}
@@ -23,7 +23,7 @@ export const Textarea = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <textarea
     className={cn(
-      "flex min-h-[56px] w-full rounded-2xl border border-[var(--color-border)] bg-white px-4 py-3 text-sm text-[#1e1e1e] placeholder:text-[var(--color-muted)] focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+      "flex min-h-[56px] w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-sm text-[var(--color-foreground)] placeholder:text-[var(--color-muted)] focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
       className,
     )}
     ref={ref}
@@ -38,7 +38,7 @@ export const Label = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <label
     ref={ref}
-    className={cn("text-sm font-medium text-[#1e1e1e]", className)}
+    className={cn("text-sm font-medium text-[var(--color-foreground)]", className)}
     {...props}
   />
 ));

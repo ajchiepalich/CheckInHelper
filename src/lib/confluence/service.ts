@@ -1,5 +1,11 @@
 import { readFile } from "fs/promises";
 import path from "path";
+import { normalizeBaseUrl } from "@/lib/confluence/parse";
+import {
+  externalPageId,
+  fetchExternalSharePage,
+} from "@/lib/confluence/external-fetch";
+import { parseExternalToken } from "@/lib/confluence/parse";
 
 export type ConfluencePage = {
   id: string;
@@ -12,40 +18,69 @@ export type ConfluencePage = {
   updatedAt: string;
 };
 
-export type ConfluenceClientConfig = {
-  baseUrl: string;
-  email: string;
-  apiToken: string;
-};
-
 export interface ConfluenceService {
   fetchPage(pageId: string): Promise<ConfluencePage>;
   validatePage(pageId: string): Promise<ConfluencePage>;
 }
 
-function authHeader(email: string, apiToken: string): string {
-  return `Basic ${Buffer.from(`${email}:${apiToken}`).toString("base64")}`;
+type ConfluenceApiPage = {
+  id: string;
+  title: string;
+  version: { number: number; when?: string };
+  space?: { id: string; key: string };
+  body?: { storage?: { value?: string } };
+  _links?: { webui?: string; base?: string };
+};
+
+function mapConfluencePage(
+  data: ConfluenceApiPage,
+  baseUrl: string,
+): ConfluencePage {
+  const webui =
+    data._links?.webui ?? `/pages/viewpage.action?pageId=${data.id}`;
+  const base = data._links?.base ?? `${normalizeBaseUrl(baseUrl)}/wiki`;
+
+  return {
+    id: data.id,
+    title: data.title,
+    version: data.version.number,
+    spaceId: data.space?.id ?? "",
+    spaceKey: data.space?.key ?? "",
+    webUrl: `${base}${webui}`,
+    bodyHtml: data.body?.storage?.value ?? "",
+    updatedAt: data.version.when ?? new Date().toISOString(),
+  };
 }
 
-export class AtlassianConfluenceService implements ConfluenceService {
-  constructor(private readonly config: ConfluenceClientConfig) {}
+export class PublicConfluenceService implements ConfluenceService {
+  constructor(private readonly baseUrl: string) {}
 
   private get apiBase(): string {
-    return `${this.config.baseUrl.replace(/\/$/, "")}/wiki/rest/api`;
+    return `${normalizeBaseUrl(this.baseUrl)}/wiki/rest/api`;
   }
 
   async fetchPage(pageId: string): Promise<ConfluencePage> {
+    if (pageId.startsWith("external:")) {
+      const token = pageId.slice("external:".length);
+      return fetchExternalSharePage({ baseUrl: this.baseUrl, token });
+    }
+
     const url = `${this.apiBase}/content/${pageId}?expand=body.storage,version,space,_links`;
     const response = await fetch(url, {
       headers: {
-        Authorization: authHeader(this.config.email, this.config.apiToken),
         Accept: "application/json",
       },
     });
 
+    if (response.status === 401 || response.status === 403) {
+      throw new ConfluenceAccessDeniedError(
+        `Confluence page ${pageId} is not publicly accessible. Enable anonymous access for this page before adding it as a source.`,
+      );
+    }
+
     if (response.status === 404) {
       throw new ConfluenceNotFoundError(
-        `Confluence page ${pageId} was not found.`,
+        `Confluence page ${pageId} was not found at ${this.baseUrl}.`,
       );
     }
 
@@ -56,34 +91,20 @@ export class AtlassianConfluenceService implements ConfluenceService {
       );
     }
 
-    const data = (await response.json()) as {
-      id: string;
-      title: string;
-      version: { number: number; when?: string };
-      space?: { id: string; key: string };
-      body?: { storage?: { value?: string } };
-      _links?: { webui?: string; base?: string };
-    };
-
-    const webui =
-      data._links?.webui ?? `/pages/viewpage.action?pageId=${data.id}`;
-    const base =
-      data._links?.base ?? `${this.config.baseUrl.replace(/\/$/, "")}/wiki`;
-
-    return {
-      id: data.id,
-      title: data.title,
-      version: data.version.number,
-      spaceId: data.space?.id ?? "",
-      spaceKey: data.space?.key ?? "",
-      webUrl: `${base}${webui}`,
-      bodyHtml: data.body?.storage?.value ?? "",
-      updatedAt: data.version.when ?? new Date().toISOString(),
-    };
+    const data = (await response.json()) as ConfluenceApiPage;
+    return mapConfluencePage(data, this.baseUrl);
   }
 
   async validatePage(pageId: string): Promise<ConfluencePage> {
     return this.fetchPage(pageId);
+  }
+
+  async validateExternalUrl(pageUrl: string): Promise<ConfluencePage> {
+    const token = parseExternalToken(pageUrl);
+    if (!token) {
+      throw new ConfluenceApiError("Invalid external Confluence link.");
+    }
+    return fetchExternalSharePage({ baseUrl: this.baseUrl, token });
   }
 }
 
@@ -118,6 +139,13 @@ export class ConfluenceNotFoundError extends Error {
   }
 }
 
+export class ConfluenceAccessDeniedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ConfluenceAccessDeniedError";
+  }
+}
+
 export class ConfluenceApiError extends Error {
   constructor(message: string) {
     super(message);
@@ -128,22 +156,18 @@ export class ConfluenceApiError extends Error {
 export function createConfluenceService(options: {
   mock: boolean;
   baseUrl?: string;
-  email?: string;
-  apiToken?: string;
 }): ConfluenceService {
   if (options.mock) {
     return new MockConfluenceService();
   }
 
-  if (!options.baseUrl || !options.email || !options.apiToken) {
+  if (!options.baseUrl) {
     throw new Error(
-      "Confluence credentials are required when mock mode is disabled.",
+      "ATLASSIAN_BASE_URL is required when LOCAL_MOCK_MODE is disabled.",
     );
   }
 
-  return new AtlassianConfluenceService({
-    baseUrl: options.baseUrl,
-    email: options.email,
-    apiToken: options.apiToken,
-  });
+  return new PublicConfluenceService(options.baseUrl);
 }
+
+export { externalPageId, parseExternalToken } from "@/lib/confluence/parse";

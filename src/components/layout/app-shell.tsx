@@ -73,7 +73,7 @@ export function AppShell({
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="border-b border-[var(--color-border)] bg-white/80 px-4 py-4 backdrop-blur md:px-8">
+          <header className="border-b border-[var(--color-border)] bg-[var(--color-header)] px-4 py-4 backdrop-blur md:px-8">
             <div>
               {title ? (
                 <h2 className="text-2xl font-bold text-[var(--color-primary)]">
@@ -99,7 +99,7 @@ export function AppShell({
                     pathname === item.href ||
                       pathname.startsWith(`${item.href}/`)
                       ? "bg-[var(--color-primary-dark)] text-white"
-                      : "bg-[#eef5f3] text-[var(--color-primary)]",
+                      : "bg-[var(--color-surface-muted)] text-[var(--color-primary)]",
                   )}
                 >
                   {item.label}

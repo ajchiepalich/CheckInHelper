@@ -30,6 +30,7 @@ If the issue is urgent and affects ministry operations, follow the escalation gu
         confluenceUpdatedAt: "2026-07-01T12:00:00.000Z",
         knowledgeSourceId: "mock-source-1",
         openaiFileId: "file-mock-1",
+        snippet: "Submit a ticket through the IT Service Portal.",
       },
     ],
   },

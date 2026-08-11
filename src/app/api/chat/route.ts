@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
               latencyMs: number;
               retrievalCount: number;
               citations: MappedCitation[];
+              diagnostics?: import("@/lib/assistant/citations").RetrievalDiagnostics;
             }
           | undefined;
 
@@ -129,6 +130,7 @@ export async function POST(request: NextRequest) {
                 latencyMs: event.latencyMs,
                 retrievalCount: event.retrievalCount,
                 citations: event.citations,
+                diagnostics: event.diagnostics,
               };
               controller.enqueue(encoder.encode(encodeSse(event)));
             } else if (event.type === "error") {
@@ -146,6 +148,7 @@ export async function POST(request: NextRequest) {
                 model: completion.model,
                 latencyMs: completion.latencyMs,
                 retrievalCount: completion.retrievalCount,
+                retrievalDiagnostics: completion.diagnostics ?? undefined,
               },
             });
 
@@ -158,10 +161,12 @@ export async function POST(request: NextRequest) {
                   title: c.title,
                   sourceUrl: c.sourceUrl,
                   confluencePageId: c.confluencePageId,
+                  confluenceVersion: c.confluenceVersion,
                   spaceKey: c.spaceKey,
                   confluenceUpdatedAt: c.confluenceUpdatedAt
                     ? new Date(c.confluenceUpdatedAt)
                     : undefined,
+                  snippet: c.snippet,
                 })),
               });
             }

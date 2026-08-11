@@ -8,6 +8,7 @@ export type CitationView = {
   sourceUrl: string;
   spaceKey?: string | null;
   confluenceUpdatedAt?: string | Date | null;
+  snippet?: string | null;
 };
 
 export function CitationCard({
@@ -32,12 +33,17 @@ export function CitationCard({
             {citation.spaceKey ? `${citation.spaceKey} · ` : ""}
             Updated {formatRelativeDate(citation.confluenceUpdatedAt)}
           </p>
+          {citation.snippet ? (
+            <p className="mt-2 line-clamp-3 text-sm text-[var(--color-foreground)]">
+              {citation.snippet}
+            </p>
+          ) : null}
         </button>
         <a
           href={citation.sourceUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#eef5f3] text-[var(--color-secondary)]"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--color-accent-soft)] text-[var(--color-secondary)]"
           aria-label={`Open ${citation.title} in Confluence`}
         >
           <ExternalLink className="h-4 w-4" />

@@ -23,6 +23,18 @@ describe("parseConfluenceUrl", () => {
     });
   });
 
+  it("parses external share URLs", () => {
+    const url =
+      "https://churchofthehighlands.atlassian.net/wiki/external/ZDkyNjRlMWEyYmM2NGY4MmE5ZTA4NTliZWVmNGI2ZWM";
+    expect(parseConfluenceUrl(url)).toEqual({
+      kind: "external",
+      pageId:
+        "external:ZDkyNjRlMWEyYmM2NGY4MmE5ZTA4NTliZWVmNGI2ZWM",
+      token: "ZDkyNjRlMWEyYmM2NGY4MmE5ZTA4NTliZWVmNGI2ZWM",
+      url,
+    });
+  });
+
   it("returns null for invalid input", () => {
     expect(parseConfluenceUrl("not-a-url")).toBeNull();
   });

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AppProviders } from "@/components/providers/app-providers";
+import { ThemeProvider } from "@/components/providers/theme-provider";
 import { getEnv, isLocalMockMode } from "@/lib/env";
 
 export const metadata: Metadata = {
@@ -17,9 +18,11 @@ export default function RootLayout({
   getEnv();
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
-        <AppProviders mockMode={isLocalMockMode()}>{children}</AppProviders>
+        <ThemeProvider>
+          <AppProviders mockMode={isLocalMockMode()}>{children}</AppProviders>
+        </ThemeProvider>
       </body>
     </html>
   );

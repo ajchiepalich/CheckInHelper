@@ -51,7 +51,7 @@ See [`.env.example`](./.env.example). Required for production:
 - `AUTH_SECRET`
 - `ENTRA_CLIENT_ID`, `ENTRA_CLIENT_SECRET`, `ENTRA_TENANT_ID`
 - `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_VECTOR_STORE_ID`
-- `ATLASSIAN_BASE_URL`, `ATLASSIAN_USER_EMAIL`, `ATLASSIAN_API_TOKEN`
+- `ATLASSIAN_BASE_URL`
 - `CRON_SECRET`
 - `APP_URL`
 
@@ -59,11 +59,12 @@ Set `LOCAL_AUTH_ENABLED=false` and `LOCAL_MOCK_MODE=false` in production.
 
 ## Configure Confluence
 
-1. Create an Atlassian API token for a service account with read access to approved spaces.
-2. Set `ATLASSIAN_BASE_URL`, `ATLASSIAN_USER_EMAIL`, and `ATLASSIAN_API_TOKEN`.
-3. Sign in as an admin and open **Admin → Sources**.
-4. Add explicit Confluence page URLs or page IDs. Parent/descendant and label modes are modeled but only explicit pages sync in v1.
-5. Run **Sync source** or **Run full sync**.
+1. Ensure each approved page is **publicly accessible** in Confluence.
+2. Set `ATLASSIAN_BASE_URL` to your Confluence Cloud site.
+3. Admin → **Sources** → add the public page URL or page ID.
+4. Run **Sync source** or **Run full sync**.
+
+The app uses the public Confluence REST API without Atlassian credentials. If a page cannot be accessed anonymously, sync fails with a clear admin error.
 
 ## Configure OpenAI vector store
 

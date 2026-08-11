@@ -115,9 +115,9 @@ export function SourcesManager({
             <p className="mt-4 text-sm text-[var(--color-muted)]">{message}</p>
           ) : null}
           <p className="mt-4 text-sm text-[var(--color-muted)]">
-            Explicit pages are fully supported. Parent-with-descendants and
-            label-based sources are modeled but require additional Confluence
-            traversal to enable.
+            Sources must be publicly accessible Confluence pages. The app fetches
+            content anonymously through the Confluence REST API and does not use
+            Atlassian credentials.
           </p>
         </CardContent>
       </Card>

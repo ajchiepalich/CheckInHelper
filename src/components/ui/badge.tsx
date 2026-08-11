@@ -1,11 +1,11 @@
 import { cn } from "@/lib/utils";
 
 const variants = {
-  default: "bg-[#eef5f3] text-[var(--color-secondary)]",
-  success: "bg-[#e7f5ef] text-[var(--color-secondary)]",
-  warning: "bg-[#fff8e8] text-[#6e5530]",
-  error: "bg-[#fdecea] text-[var(--color-error)]",
-  muted: "bg-[#f1f0ec] text-[var(--color-muted)]",
+  default: "bg-[var(--color-accent-soft)] text-[var(--color-secondary)]",
+  success: "bg-[var(--color-success-bg)] text-[var(--color-secondary)]",
+  warning: "bg-[var(--color-warning-bg)] text-[var(--color-warning-text)]",
+  error: "bg-[var(--color-error-bg)] text-[var(--color-error)]",
+  muted: "bg-[var(--color-surface-muted)] text-[var(--color-muted)]",
 } as const;
 
 export function Badge({

@@ -30,8 +30,6 @@ export const envSchema = z
     OPENAI_MODEL: z.string().default("gpt-4.1-mini"),
     OPENAI_VECTOR_STORE_ID: optionalString,
     ATLASSIAN_BASE_URL: optionalString,
-    ATLASSIAN_USER_EMAIL: optionalString,
-    ATLASSIAN_API_TOKEN: optionalString,
     CRON_SECRET: optionalString,
     CHAT_RATE_LIMIT: z.coerce.number().int().positive().default(20),
     SYNC_RATE_LIMIT: z.coerce.number().int().positive().default(5),
@@ -109,12 +107,7 @@ export function isEntraConfigured(): boolean {
 }
 
 export function isConfluenceConfigured(): boolean {
-  const env = getEnv();
-  return Boolean(
-    env.ATLASSIAN_BASE_URL &&
-    env.ATLASSIAN_USER_EMAIL &&
-    env.ATLASSIAN_API_TOKEN,
-  );
+  return Boolean(getEnv().ATLASSIAN_BASE_URL);
 }
 
 export function resetEnvCacheForTests(): void {

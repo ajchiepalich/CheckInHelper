@@ -6,7 +6,7 @@ import rehypeSanitize from "rehype-sanitize";
 
 export function MarkdownContent({ content }: { content: string }) {
   return (
-    <div className="prose-highlands max-w-none text-[#1e1e1e]">
+    <div className="prose-highlands max-w-none text-[var(--color-foreground)]">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeSanitize]}

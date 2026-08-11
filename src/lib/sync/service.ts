@@ -10,11 +10,12 @@ import {
   type Prisma,
 } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { getEnv, isConfluenceConfigured, isLocalMockMode } from "@/lib/env";
+import { getEnv, isLocalMockMode } from "@/lib/env";
 import { buildMarkdownDocument } from "@/lib/confluence/markdown";
 import {
   createConfluenceService,
   ConfluenceNotFoundError,
+  ConfluenceAccessDeniedError,
 } from "@/lib/confluence/service";
 import { hashContent, logError, logInfo } from "@/lib/logger";
 import { detectSourceChange } from "@/lib/sync/detection";
@@ -106,10 +107,8 @@ export async function runSynchronization(
   }
 
   const confluence = createConfluenceService({
-    mock: isLocalMockMode() || !isConfluenceConfigured(),
+    mock: isLocalMockMode(),
     baseUrl: env.ATLASSIAN_BASE_URL,
-    email: env.ATLASSIAN_USER_EMAIL,
-    apiToken: env.ATLASSIAN_API_TOKEN,
   });
 
   const vectorStore = isLocalMockMode() ? null : new OpenAIVectorStoreService();
@@ -253,11 +252,19 @@ async function syncSingleSource(params: {
   try {
     page = await params.confluence.fetchPage(source.confluencePageId);
   } catch (error) {
-    if (error instanceof ConfluenceNotFoundError) {
+    if (
+      error instanceof ConfluenceNotFoundError ||
+      error instanceof ConfluenceAccessDeniedError
+    ) {
+      const status =
+        error instanceof ConfluenceAccessDeniedError
+          ? SourceStatus.FAILED
+          : SourceStatus.UNAVAILABLE;
+
       await prisma.knowledgeSource.update({
         where: { id: source.id },
         data: {
-          status: SourceStatus.UNAVAILABLE,
+          status,
           lastError: error.message,
           lastAttemptedSyncAt: new Date(),
         },
@@ -435,13 +442,13 @@ export async function validateAndCreateSource(input: {
   }
 
   const confluence = createConfluenceService({
-    mock: isLocalMockMode() || !isConfluenceConfigured(),
+    mock: isLocalMockMode(),
     baseUrl: env.ATLASSIAN_BASE_URL,
-    email: env.ATLASSIAN_USER_EMAIL,
-    apiToken: env.ATLASSIAN_API_TOKEN,
   });
 
   const page = await confluence.validatePage(parsed.pageId);
+  const sourceUrl =
+    parsed.kind === "external" ? parsed.url : page.webUrl;
 
   const existing = await prisma.knowledgeSource.findFirst({
     where: { confluencePageId: page.id, sourceType: "EXPLICIT_PAGE" },
@@ -453,7 +460,7 @@ export async function validateAndCreateSource(input: {
   const source = await prisma.knowledgeSource.create({
     data: {
       confluencePageId: page.id,
-      sourceUrl: page.webUrl,
+      sourceUrl,
       title: page.title,
       spaceId: page.spaceId,
       spaceKey: page.spaceKey,

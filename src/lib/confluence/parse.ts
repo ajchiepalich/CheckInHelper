@@ -1,6 +1,7 @@
 export type ParsedConfluenceReference =
   | { kind: "pageId"; pageId: string }
-  | { kind: "url"; pageId: string; url: string };
+  | { kind: "url"; pageId: string; url: string }
+  | { kind: "external"; pageId: string; token: string; url: string };
 
 const PAGE_ID_PATTERN = /^\d+$/;
 
@@ -10,6 +11,30 @@ export function parseConfluencePageId(input: string): string | null {
     return trimmed;
   }
   return null;
+}
+
+export function externalPageId(token: string): string {
+  return `external:${token}`;
+}
+
+export function parseExternalToken(input: string): string | null {
+  const trimmed = input.trim();
+
+  try {
+    const url = new URL(trimmed);
+    const match = url.pathname.match(/\/wiki\/external\/([^/]+)/);
+    if (match?.[1]) return match[1];
+  } catch {
+    if (/^[A-Za-z0-9+/=_-]+$/.test(trimmed) && trimmed.length >= 16) {
+      return trimmed;
+    }
+  }
+
+  return null;
+}
+
+export function buildExternalShareUrl(baseUrl: string, token: string): string {
+  return `${normalizeBaseUrl(baseUrl)}/wiki/external/${token}`;
 }
 
 export function parseConfluenceUrl(
@@ -24,6 +49,16 @@ export function parseConfluenceUrl(
 
   try {
     const url = new URL(trimmed);
+    const externalMatch = url.pathname.match(/\/wiki\/external\/([^/]+)/);
+    if (externalMatch?.[1]) {
+      return {
+        kind: "external",
+        pageId: externalPageId(externalMatch[1]),
+        token: externalMatch[1],
+        url: trimmed,
+      };
+    }
+
     const viewMatch = url.pathname.match(/\/pages\/(\d+)/);
     if (viewMatch?.[1]) {
       return { kind: "url", pageId: viewMatch[1], url: trimmed };
@@ -34,6 +69,15 @@ export function parseConfluenceUrl(
       return { kind: "url", pageId: tinyLink, url: trimmed };
     }
   } catch {
+    const externalToken = parseExternalToken(trimmed);
+    if (externalToken) {
+      return {
+        kind: "external",
+        pageId: externalPageId(externalToken),
+        token: externalToken,
+        url: trimmed,
+      };
+    }
     return null;
   }
 

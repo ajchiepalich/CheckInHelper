@@ -34,9 +34,13 @@ Source create/update/delete/enable/disable and manual sync triggers write `Audit
 
 Structured logs avoid message content by default. Diagnostics endpoint exposes only non-secret capability flags.
 
-## Atlassian domain allowlist
+## Atlassian access
 
-Source URLs should belong to the configured `ATLASSIAN_BASE_URL` host. Validate new sources before saving.
+Configured Confluence pages must be publicly accessible.
+
+The application fetches content anonymously through the Confluence REST API. It does not use `ATLASSIAN_USER_EMAIL` or `ATLASSIAN_API_TOKEN`, and it will not attempt authenticated Atlassian access automatically.
+
+If a configured page cannot be accessed anonymously, sync fails with a clear admin error.
 
 ## Production checklist
 

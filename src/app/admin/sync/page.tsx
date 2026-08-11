@@ -76,7 +76,7 @@ export default async function AdminSyncPage() {
                   </p>
                 ) : null}
                 {run.items.length > 0 ? (
-                  <ul className="space-y-2 rounded-xl bg-[#f7f6f2] p-4">
+                  <ul className="space-y-2 rounded-xl bg-[var(--color-surface-muted)] p-4">
                     {run.items.map((item) => (
                       <li key={item.id}>
                         <span className="font-medium">
