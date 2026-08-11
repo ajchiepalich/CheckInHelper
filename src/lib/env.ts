@@ -35,7 +35,7 @@ export const envSchema = z
     SYNC_RATE_LIMIT: z.coerce.number().int().positive().default(5),
   })
   .superRefine((data, ctx) => {
-    const isNextBuild = process.env.NEXT_PHASE === "phase-production-build";
+    const isNextBuild = isNextBuildPhase();
     const enforceProduction = data.NODE_ENV === "production" && !isNextBuild;
 
     if (enforceProduction && data.LOCAL_AUTH_ENABLED) {
@@ -76,11 +76,33 @@ export const envSchema = z
 
 export type AppEnv = z.infer<typeof envSchema>;
 
+const BUILD_PLACEHOLDER_DATABASE_URL =
+  "postgresql://build:build@127.0.0.1:5432/build?schema=public";
+const BUILD_PLACEHOLDER_AUTH_SECRET =
+  "build-time-placeholder-secret-minimum-32-characters";
+
+function isNextBuildPhase(): boolean {
+  return process.env.NEXT_PHASE === "phase-production-build";
+}
+
+function getEnvSource(): NodeJS.ProcessEnv {
+  if (!isNextBuildPhase()) {
+    return process.env;
+  }
+
+  return {
+    ...process.env,
+    DATABASE_URL:
+      process.env.DATABASE_URL ?? BUILD_PLACEHOLDER_DATABASE_URL,
+    AUTH_SECRET: process.env.AUTH_SECRET ?? BUILD_PLACEHOLDER_AUTH_SECRET,
+  };
+}
+
 let cachedEnv: AppEnv | null = null;
 
 export function getEnv(): AppEnv {
   if (cachedEnv) return cachedEnv;
-  const parsed = envSchema.safeParse(process.env);
+  const parsed = envSchema.safeParse(getEnvSource());
   if (!parsed.success) {
     const messages = parsed.error.issues
       .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
