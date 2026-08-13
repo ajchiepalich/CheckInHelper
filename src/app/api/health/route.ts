@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDiagnosticsSummary } from "@/lib/logger";
+import { getDiagnosticsSummary, logError } from "@/lib/logger";
 import { getDb } from "@/lib/db";
 
 export async function GET() {
@@ -11,12 +11,15 @@ export async function GET() {
       timestamp: new Date().toISOString(),
       diagnostics: getDiagnosticsSummary(),
     });
-  } catch {
+  } catch (error) {
+    logError("health.database.failed", error);
     return NextResponse.json(
       {
         status: "degraded",
         timestamp: new Date().toISOString(),
         diagnostics: getDiagnosticsSummary(),
+        database:
+          error instanceof Error ? error.message : "Database health check failed.",
       },
       { status: 503 },
     );

@@ -80,7 +80,14 @@ export function ChatExperience({
       });
 
       if (!response.ok || !response.body) {
-        throw new Error("Unable to reach the assistant.");
+        const payload = (await response.json().catch(() => null)) as
+          | { error?: string; traceId?: string }
+          | null;
+        throw new Error(
+          payload?.traceId
+            ? `${payload.error ?? "Unable to reach the assistant."} Reference: ${payload.traceId}`
+            : (payload?.error ?? "Unable to reach the assistant."),
+        );
       }
 
       const reader = response.body.getReader();
@@ -130,11 +137,11 @@ export function ChatExperience({
               prev.map((m) =>
                 m.id === assistantId
                   ? {
-                      ...m,
-                      content: payload.text ?? m.content,
-                      citations: payload.citations ?? [],
-                      id: payload.messageId ?? assistantId,
-                    }
+                    ...m,
+                    content: payload.text ?? m.content,
+                    citations: payload.citations ?? [],
+                    id: payload.messageId ?? assistantId,
+                  }
                   : m,
               ),
             );
@@ -143,10 +150,10 @@ export function ChatExperience({
               prev.map((m) =>
                 m.id === assistantId
                   ? {
-                      ...m,
-                      id: payload.messageId ?? assistantId,
-                      citations: payload.citations ?? m.citations,
-                    }
+                    ...m,
+                    id: payload.messageId ?? assistantId,
+                    citations: payload.citations ?? m.citations,
+                  }
                   : m,
               ),
             );
@@ -237,183 +244,183 @@ export function ChatExperience({
             </div>
           </div>
         ) : (
-            <div className="flex-1 space-y-6">
-              {messages.map((message) => (
-                <article
-                  key={message.id}
-                  aria-live={
-                    message.role === "assistant" && isStreaming
-                      ? "polite"
-                      : undefined
-                  }
-                  className={
-                    message.role === "user"
-                      ? "ml-auto max-w-3xl rounded-2xl bg-[var(--color-surface)] px-5 py-4 shadow-[var(--shadow-soft)]"
-                      : "max-w-4xl"
-                  }
-                >
-                  <p className="mb-2 text-xs font-semibold tracking-wide text-[var(--color-muted)] uppercase">
-                    {message.role === "user"
-                      ? "You"
-                      : "Documentation assistant"}
+          <div className="flex-1 space-y-6">
+            {messages.map((message) => (
+              <article
+                key={message.id}
+                aria-live={
+                  message.role === "assistant" && isStreaming
+                    ? "polite"
+                    : undefined
+                }
+                className={
+                  message.role === "user"
+                    ? "ml-auto max-w-3xl rounded-2xl bg-[var(--color-surface)] px-5 py-4 shadow-[var(--shadow-soft)]"
+                    : "max-w-4xl"
+                }
+              >
+                <p className="mb-2 text-xs font-semibold tracking-wide text-[var(--color-muted)] uppercase">
+                  {message.role === "user"
+                    ? "You"
+                    : "Documentation assistant"}
+                </p>
+                {message.role === "assistant" ? (
+                  <MarkdownContent content={message.content || "…"} />
+                ) : (
+                  <p className="whitespace-pre-wrap text-[var(--color-foreground)]">
+                    {message.content}
                   </p>
-                  {message.role === "assistant" ? (
-                    <MarkdownContent content={message.content || "…"} />
-                  ) : (
-                    <p className="whitespace-pre-wrap text-[var(--color-foreground)]">
-                      {message.content}
-                    </p>
-                  )}
+                )}
 
-                  {message.role === "assistant" &&
+                {message.role === "assistant" &&
                   message.citations &&
                   message.citations.length > 0 ? (
-                    <div className="mt-5 space-y-3">
-                      <h4 className="text-sm font-semibold text-[var(--color-primary)]">
-                        Sources
-                      </h4>
-                      <div className="grid gap-3">
-                        {message.citations.map((citation, index) => (
-                          <CitationCard
-                            key={`${message.id}-${index}`}
-                            citation={citation}
-                            onSelect={setSelectedCitation}
-                          />
-                        ))}
-                      </div>
+                  <div className="mt-5 space-y-3">
+                    <h4 className="text-sm font-semibold text-[var(--color-primary)]">
+                      Sources
+                    </h4>
+                    <div className="grid gap-3">
+                      {message.citations.map((citation, index) => (
+                        <CitationCard
+                          key={`${message.id}-${index}`}
+                          citation={citation}
+                          onSelect={setSelectedCitation}
+                        />
+                      ))}
                     </div>
-                  ) : null}
+                  </div>
+                ) : null}
 
-                  {message.role === "assistant" &&
+                {message.role === "assistant" &&
                   message.content &&
                   !message.id.startsWith("local-") ? (
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => submitFeedback(message.id, "HELPFUL")}
-                      >
-                        <ThumbsUp className="h-4 w-4" aria-hidden="true" />
-                        Helpful
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          submitFeedback(message.id, "NOT_HELPFUL")
-                        }
-                      >
-                        <ThumbsDown className="h-4 w-4" aria-hidden="true" />
-                        Not helpful
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => submitFeedback(message.id, "INCORRECT")}
-                      >
-                        <TriangleAlert className="h-4 w-4" aria-hidden="true" />
-                        Report incorrect
-                      </Button>
-                    </div>
-                  ) : null}
-                </article>
-              ))}
-              <div ref={bottomRef} />
-            </div>
-          )}
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => submitFeedback(message.id, "HELPFUL")}
+                    >
+                      <ThumbsUp className="h-4 w-4" aria-hidden="true" />
+                      Helpful
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        submitFeedback(message.id, "NOT_HELPFUL")
+                      }
+                    >
+                      <ThumbsDown className="h-4 w-4" aria-hidden="true" />
+                      Not helpful
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => submitFeedback(message.id, "INCORRECT")}
+                    >
+                      <TriangleAlert className="h-4 w-4" aria-hidden="true" />
+                      Report incorrect
+                    </Button>
+                  </div>
+                ) : null}
+              </article>
+            ))}
+            <div ref={bottomRef} />
+          </div>
+        )}
 
-          {status ? (
-            <p
-              className="mt-4 flex items-center gap-2 text-sm text-[var(--color-muted)]"
-              role="status"
-            >
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              {status}
-            </p>
-          ) : null}
-
-          {error ? (
-            <Card className="mt-4 border-[var(--color-error)] bg-[var(--color-error-bg)] p-4 text-sm text-[var(--color-error)]">
-              {error}
-            </Card>
-          ) : null}
-
-          <form
-            className="sticky bottom-0 mt-6 rounded-[1.5rem] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-soft)]"
-            onSubmit={(e) => {
-              e.preventDefault();
-              sendMessage(input);
-            }}
+        {status ? (
+          <p
+            className="mt-4 flex items-center gap-2 text-sm text-[var(--color-muted)]"
+            role="status"
           >
-            <label htmlFor="chat-input" className="sr-only">
-              Ask a documentation question
-            </label>
-            <Textarea
-              id="chat-input"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask about a process, system, or policy…"
-              rows={3}
-              disabled={isStreaming}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  sendMessage(input);
-                }
-              }}
-            />
-            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs text-[var(--color-muted)]">
-                Answers are based on approved Highlands documentation. Press
-                Enter to send, Shift+Enter for a new line.
-              </p>
-              <Button type="submit" disabled={isStreaming || !input.trim()}>
-                {isStreaming ? (
-                  <Loader2
-                    className="h-4 w-4 animate-spin"
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <Send className="h-4 w-4" aria-hidden="true" />
-                )}
-                Send
-              </Button>
-            </div>
-          </form>
-        </section>
-
-        {!embedded ? (
-          <aside aria-label="Selected source details" className="hidden lg:block">
-            <Card className="sticky top-6 p-6">
-              <h3 className="text-lg font-semibold text-[var(--color-primary)]">
-                Source details
-              </h3>
-              {selectedCitation ? (
-                <div className="mt-4 space-y-3 text-sm">
-                  <p className="font-semibold">{selectedCitation.title}</p>
-                  <p className="text-[var(--color-muted)]">
-                    {selectedCitation.spaceKey
-                      ? `Space ${selectedCitation.spaceKey}`
-                      : "Confluence source"}
-                  </p>
-                  <a
-                    href={selectedCitation.sourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex font-medium text-[var(--color-secondary)] underline"
-                  >
-                    Open in Confluence
-                  </a>
-                </div>
-              ) : (
-                <p className="mt-4 text-sm text-[var(--color-muted)]">
-                  Select a citation to preview the source details here.
-                </p>
-              )}
-            </Card>
-          </aside>
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            {status}
+          </p>
         ) : null}
-      </div>
+
+        {error ? (
+          <Card className="mt-4 border-[var(--color-error)] bg-[var(--color-error-bg)] p-4 text-sm text-[var(--color-error)]">
+            {error}
+          </Card>
+        ) : null}
+
+        <form
+          className="sticky bottom-0 mt-6 rounded-[1.5rem] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-soft)]"
+          onSubmit={(e) => {
+            e.preventDefault();
+            sendMessage(input);
+          }}
+        >
+          <label htmlFor="chat-input" className="sr-only">
+            Ask a documentation question
+          </label>
+          <Textarea
+            id="chat-input"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask about a process, system, or policy…"
+            rows={3}
+            disabled={isStreaming}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage(input);
+              }
+            }}
+          />
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-[var(--color-muted)]">
+              Answers are based on approved Highlands documentation. Press
+              Enter to send, Shift+Enter for a new line.
+            </p>
+            <Button type="submit" disabled={isStreaming || !input.trim()}>
+              {isStreaming ? (
+                <Loader2
+                  className="h-4 w-4 animate-spin"
+                  aria-hidden="true"
+                />
+              ) : (
+                <Send className="h-4 w-4" aria-hidden="true" />
+              )}
+              Send
+            </Button>
+          </div>
+        </form>
+      </section>
+
+      {!embedded ? (
+        <aside aria-label="Selected source details" className="hidden lg:block">
+          <Card className="sticky top-6 p-6">
+            <h3 className="text-lg font-semibold text-[var(--color-primary)]">
+              Source details
+            </h3>
+            {selectedCitation ? (
+              <div className="mt-4 space-y-3 text-sm">
+                <p className="font-semibold">{selectedCitation.title}</p>
+                <p className="text-[var(--color-muted)]">
+                  {selectedCitation.spaceKey
+                    ? `Space ${selectedCitation.spaceKey}`
+                    : "Confluence source"}
+                </p>
+                <a
+                  href={selectedCitation.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex font-medium text-[var(--color-secondary)] underline"
+                >
+                  Open in Confluence
+                </a>
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-[var(--color-muted)]">
+                Select a citation to preview the source details here.
+              </p>
+            )}
+          </Card>
+        </aside>
+      ) : null}
+    </div>
   );
 
   if (embedded) {

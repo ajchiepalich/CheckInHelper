@@ -221,7 +221,10 @@ export async function POST(request: NextRequest) {
     }
     logError("chat.request.failed", error, { traceId });
     return new Response(
-      JSON.stringify({ error: "Unable to process chat request." }),
+      JSON.stringify({
+        error: "Unable to process chat request.",
+        traceId,
+      }),
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
