@@ -73,21 +73,31 @@ export function AppShell({
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="border-b border-[var(--color-border)] bg-[var(--color-header)] px-4 py-4 backdrop-blur md:px-8">
-            <div>
-              {title ? (
-                <h2 className="text-2xl font-bold text-[var(--color-primary)]">
-                  {title}
-                </h2>
-              ) : null}
-              {subtitle ? (
-                <p className="mt-1 text-sm text-[var(--color-muted)]">
-                  {subtitle}
-                </p>
-              ) : null}
-            </div>
+          <header
+            className={cn(
+              "border-b border-[var(--color-border)] bg-[var(--color-header)] px-4 backdrop-blur md:px-8",
+              title || subtitle ? "py-4" : "py-3 md:hidden",
+            )}
+          >
+            {title || subtitle ? (
+              <div>
+                {title ? (
+                  <h2 className="text-2xl font-bold text-[var(--color-primary)]">
+                    {title}
+                  </h2>
+                ) : null}
+                {subtitle ? (
+                  <p className="mt-1 text-sm text-[var(--color-muted)]">
+                    {subtitle}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
             <nav
-              className="mt-4 flex gap-2 overflow-x-auto md:hidden"
+              className={cn(
+                "flex gap-2 overflow-x-auto md:hidden",
+                title || subtitle ? "mt-4" : null,
+              )}
               aria-label="Mobile"
             >
               {nav.map((item) => (

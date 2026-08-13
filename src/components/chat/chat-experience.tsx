@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  Check,
   Loader2,
   Send,
   ThumbsDown,
@@ -44,7 +45,18 @@ export function ChatExperience({
   const [selectedCitation, setSelectedCitation] = useState<CitationView | null>(
     null,
   );
+  const [feedbackByMessage, setFeedbackByMessage] = useState<
+    Record<string, "confirming" | "hidden">
+  >({});
+  const feedbackHideTimers = useRef<Record<string, number>>({});
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const timers = feedbackHideTimers.current;
+    return () => {
+      Object.values(timers).forEach((timer) => window.clearTimeout(timer));
+    };
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -175,24 +187,44 @@ export function ChatExperience({
     messageId: string,
     helpful: "HELPFUL" | "NOT_HELPFUL" | "INCORRECT",
   ) {
-    if (!conversationId) return;
-    await fetch("/api/feedback", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        conversationId,
-        messageId,
-        helpful,
-        suggestsDocumentationGap: helpful !== "HELPFUL",
-      }),
-    });
+    if (!conversationId || feedbackByMessage[messageId]) return;
+
+    setFeedbackByMessage((prev) => ({ ...prev, [messageId]: "confirming" }));
+
+    try {
+      await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId,
+          messageId,
+          helpful,
+          suggestsDocumentationGap: helpful !== "HELPFUL",
+        }),
+      });
+    } catch {
+      // Keep the confirmation UI even if the request fails so the row still clears.
+    }
+
+    if (feedbackHideTimers.current[messageId]) {
+      window.clearTimeout(feedbackHideTimers.current[messageId]);
+    }
+    feedbackHideTimers.current[messageId] = window.setTimeout(() => {
+      setFeedbackByMessage((prev) => ({ ...prev, [messageId]: "hidden" }));
+      delete feedbackHideTimers.current[messageId];
+    }, 1400);
   }
 
   function startNewConversation() {
+    Object.values(feedbackHideTimers.current).forEach((timer) =>
+      window.clearTimeout(timer),
+    );
+    feedbackHideTimers.current = {};
     setConversationId(undefined);
     setMessages([]);
     setSelectedCitation(null);
     setError(null);
+    setFeedbackByMessage({});
   }
 
   const showEmptyState = messages.length === 0;
@@ -293,35 +325,54 @@ export function ChatExperience({
 
                 {message.role === "assistant" &&
                   message.content &&
-                  !message.id.startsWith("local-") ? (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => submitFeedback(message.id, "HELPFUL")}
+                  !message.id.startsWith("local-") &&
+                  feedbackByMessage[message.id] !== "hidden" ? (
+                  feedbackByMessage[message.id] === "confirming" ? (
+                    <div
+                      className="feedback-confirm mt-4 flex items-center gap-2 text-sm font-medium text-[var(--color-primary-dark)]"
+                      role="status"
+                      aria-live="polite"
                     >
-                      <ThumbsUp className="h-4 w-4" aria-hidden="true" />
-                      Helpful
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        submitFeedback(message.id, "NOT_HELPFUL")
-                      }
-                    >
-                      <ThumbsDown className="h-4 w-4" aria-hidden="true" />
-                      Not helpful
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => submitFeedback(message.id, "INCORRECT")}
-                    >
-                      <TriangleAlert className="h-4 w-4" aria-hidden="true" />
-                      Report incorrect
-                    </Button>
-                  </div>
+                      <span className="feedback-confirm-icon inline-flex h-7 w-7 items-center justify-center rounded-full bg-[var(--color-success-bg)]">
+                        <Check className="h-4 w-4" aria-hidden="true" />
+                      </span>
+                      Thanks for your feedback
+                    </div>
+                  ) : (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => submitFeedback(message.id, "HELPFUL")}
+                      >
+                        <ThumbsUp className="h-4 w-4" aria-hidden="true" />
+                        Helpful
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          submitFeedback(message.id, "NOT_HELPFUL")
+                        }
+                      >
+                        <ThumbsDown className="h-4 w-4" aria-hidden="true" />
+                        Not helpful
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          submitFeedback(message.id, "INCORRECT")
+                        }
+                      >
+                        <TriangleAlert
+                          className="h-4 w-4"
+                          aria-hidden="true"
+                        />
+                        Report incorrect
+                      </Button>
+                    </div>
+                  )
                 ) : null}
               </article>
             ))}
@@ -431,12 +482,5 @@ export function ChatExperience({
     );
   }
 
-  return (
-    <AppShell
-      title="Staff documentation chat"
-      subtitle="Answers come from approved Highlands Confluence documentation."
-    >
-      {chatContent}
-    </AppShell>
-  );
+  return <AppShell>{chatContent}</AppShell>;
 }

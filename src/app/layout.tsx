@@ -8,9 +8,21 @@ import { getEnv, isLocalMockMode } from "@/lib/env";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.APP_URL ?? "http://localhost:3000"),
   title: "Highlands Documentation Assistant",
   description:
     "Internal AI assistant for Church of the Highlands staff documentation.",
+  openGraph: {
+    title: "AI Helper",
+    description:
+      "Internal AI assistant for Church of the Highlands staff documentation.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AI Helper",
+    description:
+      "Internal AI assistant for Church of the Highlands staff documentation.",
+  },
 };
 
 export default function RootLayout({
