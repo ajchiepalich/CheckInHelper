@@ -31,7 +31,7 @@ Add in **Amplify → App settings → Environment variables** (production branch
 
 | Variable | Value | Notes |
 | -------- | ----- | ----- |
-| `APP_URL` | `https://helper.highlands.io` | Must match live domain |
+| `APP_URL` | `https://helper.highlands.io` | Optional until the custom domain is configured; then it must match the live domain |
 | `NODE_ENV` | `production` | |
 | `LOCAL_MOCK_MODE` | `false` | Required in prod |
 | `LOCAL_AUTH_ENABLED` | `false` | Required in prod |

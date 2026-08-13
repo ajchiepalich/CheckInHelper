@@ -23,7 +23,7 @@ export default defineConfig({
       SUPABASE_SERVICE_ROLE_KEY:
         process.env.SUPABASE_SERVICE_ROLE_KEY ?? "test-service-role-key",
       AUTH_SECRET: "playwright-test-secret-minimum-32-chars",
-      APP_URL: "http://localhost:3000",
+      APP_URL: process.env.APP_URL ?? "http://localhost:3000",
     },
   },
 });

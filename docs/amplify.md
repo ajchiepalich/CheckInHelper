@@ -17,7 +17,7 @@ In **Amplify → App settings → Environment variables**, add every variable be
 
 | Variable | Value |
 | -------- | ----- |
-| `APP_URL` | `https://helper.highlands.io` |
+| `APP_URL` | `https://helper.highlands.io` (optional until the custom domain is configured) |
 | `NODE_ENV` | `production` |
 | `LOCAL_MOCK_MODE` | `false` |
 | `LOCAL_AUTH_ENABLED` | `false` |

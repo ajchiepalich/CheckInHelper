@@ -5,7 +5,6 @@ set -euo pipefail
 # Set these variables in Amplify Console → Environment variables.
 
 required=(
-  APP_URL
   AUTH_SECRET
   SUPABASE_URL
   SUPABASE_SERVICE_ROLE_KEY
@@ -34,7 +33,11 @@ write_env() {
   printf '%s=%q\n' "$key" "$value" >> .env.production
 }
 
-write_env APP_URL
+if [[ -n "${APP_URL:-}" ]]; then
+  write_env APP_URL
+else
+  echo "APP_URL is not set; Amplify will use the request host. Set it after configuring a custom domain." >&2
+fi
 write_env AUTH_SECRET
 write_env SUPABASE_URL
 write_env SUPABASE_SERVICE_ROLE_KEY
