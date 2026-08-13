@@ -1,4 +1,5 @@
 import { createClient, type PostgrestError } from "@supabase/supabase-js";
+import { randomUUID } from "crypto";
 import { getEnv } from "@/lib/env";
 
 export const UserRole = { STAFF: "STAFF", ADMIN: "ADMIN" } as const;
@@ -46,4 +47,10 @@ export function dbError(error: PostgrestError | null, action: string): never {
 
 export function iso(value: Date | string | null | undefined): string | null | undefined {
   return value instanceof Date ? value.toISOString() : value;
+}
+
+/** IDs are generated here because the original Prisma tables use CUID defaults
+ * in the client rather than PostgreSQL column defaults. */
+export function createId(): string {
+  return randomUUID();
 }

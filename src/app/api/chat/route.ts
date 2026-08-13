@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { requireAuth } from "@/lib/auth";
-import { dbError, getDb } from "@/lib/db";
+import { createId, dbError, getDb } from "@/lib/db";
 import { getEnv, isLocalMockMode } from "@/lib/env";
 import { createTraceId, logError } from "@/lib/logger";
 import {
@@ -56,9 +56,12 @@ export async function POST(request: NextRequest) {
         );
       }
     } else {
+      const now = new Date().toISOString();
       const { data: created, error } = await getDb().from("Conversation").insert({
+        id: createId(),
         userId: session.user.id,
         title: messageContent.slice(0, 80),
+        updatedAt: now,
       }).select("id").single();
       if (error || !created) dbError(error, "Unable to create conversation");
       conversationId = created.id;
@@ -69,6 +72,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { error: messageError } = await getDb().from("Message").insert({
+      id: createId(),
       conversationId: activeConversationId,
       role: "user",
       content: messageContent,
@@ -137,6 +141,7 @@ export async function POST(request: NextRequest) {
 
           if (completion) {
             const { data: assistantMessage, error: assistantError } = await getDb().from("Message").insert({
+              id: createId(),
               conversationId,
               role: "assistant",
               content: assistantText,
@@ -150,6 +155,7 @@ export async function POST(request: NextRequest) {
 
             if (completion.citations.length > 0) {
               const { error } = await getDb().from("MessageCitation").insert(completion.citations.map((c) => ({
+                id: createId(),
                 messageId: assistantMessage.id,
                 knowledgeSourceId: c.knowledgeSourceId,
                 openaiFileId: c.openaiFileId,

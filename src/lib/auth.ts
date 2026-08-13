@@ -1,7 +1,7 @@
 import NextAuth from "next-auth";
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import Credentials from "next-auth/providers/credentials";
-import { UserRole, type UserRole as UserRoleValue, dbError, getDb } from "@/lib/db";
+import { UserRole, type UserRole as UserRoleValue, createId, dbError, getDb } from "@/lib/db";
 import { getEnv, isEntraConfigured, isLocalAuthEnabled } from "@/lib/env";
 
 declare module "next-auth" {
@@ -28,6 +28,33 @@ declare module "@auth/core/jwt" {
 }
 
 const DEFAULT_USER_EMAIL = "guest@highlands.local";
+
+async function saveUser(input: {
+  email: string;
+  name: string;
+  role: UserRole;
+}) {
+  const db = getDb();
+  const { data: existing, error: lookupError } = await db
+    .from("User")
+    .select("id")
+    .eq("email", input.email)
+    .maybeSingle();
+  if (lookupError) dbError(lookupError, "Unable to load user");
+
+  const now = new Date().toISOString();
+  const query = existing
+    ? db
+        .from("User")
+        .update({ name: input.name, role: input.role, updatedAt: now })
+        .eq("id", existing.id)
+    : db.from("User").insert({ id: createId(), ...input, updatedAt: now });
+  const { data, error } = await query
+    .select("id, email, name, image, role")
+    .single();
+  if (error || !data) dbError(error, "Unable to save user");
+  return data;
+}
 
 function buildProviders() {
   const env = getEnv();
@@ -63,18 +90,11 @@ function buildProviders() {
             ? UserRole.ADMIN
             : UserRole.STAFF;
 
-          const { data: user, error } = await getDb()
-            .from("User")
-            .upsert({
-              email,
-              name: role === UserRole.ADMIN ? "Local Admin" : "Local Staff",
-              role,
-            }, { onConflict: "email" })
-            .select("id, email, name, image, role")
-            .single();
-          if (error || !user) dbError(error, "Unable to create local user");
-
-          return user;
+          return saveUser({
+            email,
+            name: role === UserRole.ADMIN ? "Local Admin" : "Local Staff",
+            role,
+          });
         },
       }),
     );
@@ -131,17 +151,11 @@ export type AppSession = {
 };
 
 async function getDefaultUser() {
-  const { data, error } = await getDb()
-    .from("User")
-    .upsert({
-      email: DEFAULT_USER_EMAIL,
-      name: "Guest User",
-      role: UserRole.ADMIN,
-    }, { onConflict: "email" })
-    .select("id, email, name, image, role")
-    .single();
-  if (error || !data) dbError(error, "Unable to create default user");
-  return data;
+  return saveUser({
+    email: DEFAULT_USER_EMAIL,
+    name: "Guest User",
+    role: UserRole.ADMIN,
+  });
 }
 
 export async function requireAuth(): Promise<AppSession> {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
-import { AuditEventType, dbError, getDb } from "@/lib/db";
+import { AuditEventType, createId, dbError, getDb } from "@/lib/db";
 
 const patchSchema = z.object({
   enabled: z.boolean().optional(),
@@ -25,6 +25,7 @@ export async function PATCH(
 
     if (body.enabled !== undefined) {
       const { error } = await getDb().from("AuditEvent").insert({
+        id: createId(),
         type: body.enabled
           ? AuditEventType.SOURCE_ENABLED
           : AuditEventType.SOURCE_DISABLED,
@@ -35,6 +36,7 @@ export async function PATCH(
       if (error) dbError(error, "Unable to record audit event");
     } else {
       const { error } = await getDb().from("AuditEvent").insert({
+        id: createId(),
         type: AuditEventType.SOURCE_UPDATED,
         userId: session.user.id,
         entityType: "KnowledgeSource",
@@ -77,6 +79,7 @@ export async function DELETE(
     if (deleteError) dbError(deleteError, "Unable to delete source");
 
     const { error } = await getDb().from("AuditEvent").insert({
+      id: createId(),
       type: AuditEventType.SOURCE_DELETED,
       userId: session.user.id,
       entityType: "KnowledgeSource",

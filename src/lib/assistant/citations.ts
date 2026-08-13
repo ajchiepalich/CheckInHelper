@@ -34,7 +34,7 @@ export function buildSourceFileMap(
     sourceUrl: string;
     confluencePageId: string;
     spaceKey: string | null;
-    lastKnownUpdatedAt: Date | null;
+    lastKnownUpdatedAt: Date | string | null;
     lastKnownVersion: number | null;
     openaiFileId: string | null;
   }>,
@@ -50,7 +50,10 @@ export function buildSourceFileMap(
       confluencePageId: source.confluencePageId,
       confluenceVersion: source.lastKnownVersion ?? undefined,
       spaceKey: source.spaceKey ?? undefined,
-      confluenceUpdatedAt: source.lastKnownUpdatedAt?.toISOString(),
+      confluenceUpdatedAt:
+        source.lastKnownUpdatedAt instanceof Date
+          ? source.lastKnownUpdatedAt.toISOString()
+          : source.lastKnownUpdatedAt ?? undefined,
       knowledgeSourceId: source.id,
     });
   }

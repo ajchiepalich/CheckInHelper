@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { FeedbackHelpful, dbError, getDb } from "@/lib/db";
+import { createId, FeedbackHelpful, dbError, getDb } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { FEEDBACK_MAX_COMMENT_LENGTH } from "@/lib/security";
 
@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: feedback, error } = await getDb().from("AnswerFeedback").insert({
+      id: createId(),
       userId: session.user.id,
       conversationId: body.conversationId,
       messageId: body.messageId,

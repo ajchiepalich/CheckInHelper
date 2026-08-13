@@ -3,7 +3,7 @@ import { requireAdmin } from "@/lib/auth";
 import { getEnv } from "@/lib/env";
 import { runSynchronization } from "@/lib/sync/service";
 import { checkRateLimit, verifyCronSecret } from "@/lib/security";
-import { AuditEventType, dbError, getDb, SyncTriggerType } from "@/lib/db";
+import { AuditEventType, createId, dbError, getDb, SyncTriggerType } from "@/lib/db";
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
     };
 
     const { error } = await getDb().from("AuditEvent").insert({
+      id: createId(),
       type: AuditEventType.SYNC_TRIGGERED,
       userId: session.user.id,
       metadata: body,

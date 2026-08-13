@@ -7,6 +7,7 @@ import {
   SyncRunStatus,
   SyncTriggerType,
   type KnowledgeSource,
+  createId,
   dbError,
   getDb,
 } from "@/lib/db";
@@ -52,7 +53,12 @@ async function acquireSyncLock(syncRunId: string): Promise<boolean> {
     }
   }
 
-  const { error: updateError } = await db.from("SyncLock").upsert({ id: "global", lockedAt: new Date().toISOString(), syncRunId }, { onConflict: "id" });
+  const { error: updateError } = await db.from("SyncLock").upsert({
+    id: "global",
+    lockedAt: new Date().toISOString(),
+    syncRunId,
+    updatedAt: new Date().toISOString(),
+  }, { onConflict: "id" });
   if (updateError) dbError(updateError, "Unable to acquire sync lock");
   return true;
 }
@@ -67,6 +73,7 @@ export async function runSynchronization(
 ): Promise<SyncResult> {
   const env = getEnv();
   const { data: syncRun, error: syncRunError } = await getDb().from("SyncRun").insert({
+    id: createId(),
     status: SyncRunStatus.RUNNING,
     triggerType: options.triggerType,
     triggeredById: options.triggeredById,
@@ -141,6 +148,7 @@ export async function runSynchronization(
           sourceId: source.id,
         });
         const { error: itemError } = await getDb().from("SyncItem").insert({
+          id: createId(),
           syncRunId: syncRun.id,
           knowledgeSourceId: source.id,
           status: SyncItemStatus.FAILED,
@@ -177,6 +185,7 @@ export async function runSynchronization(
 
     if (options.triggeredById) {
       const { error } = await getDb().from("AuditEvent").insert({
+        id: createId(),
         type:
           finalStatus === SyncRunStatus.COMPLETED
             ? AuditEventType.SYNC_COMPLETED
@@ -242,6 +251,7 @@ async function syncSingleSource(params: {
       }).eq("id", source.id);
       if (sourceError) dbError(sourceError, "Unable to update unavailable source");
       const { error: itemError } = await getDb().from("SyncItem").insert({
+        id: createId(),
         syncRunId: params.syncRunId,
         knowledgeSourceId: source.id,
         status: SyncItemStatus.FAILED,
@@ -287,6 +297,7 @@ async function syncSingleSource(params: {
     }).eq("id", source.id);
     if (sourceError) dbError(sourceError, "Unable to update unchanged source");
     const { error: itemError } = await getDb().from("SyncItem").insert({
+      id: createId(),
       syncRunId: params.syncRunId,
       knowledgeSourceId: source.id,
       status: SyncItemStatus.UNCHANGED,
@@ -298,6 +309,7 @@ async function syncSingleSource(params: {
 
   if (params.dryRun) {
     const { error } = await getDb().from("SyncItem").insert({
+      id: createId(),
       syncRunId: params.syncRunId,
       knowledgeSourceId: source.id,
       status: SyncItemStatus.SKIPPED,
@@ -336,6 +348,7 @@ async function syncSingleSource(params: {
   const { error: deactivateError } = await db.from("KnowledgeFile").update({ isActive: false, replacedAt: new Date().toISOString() }).eq("knowledgeSourceId", source.id).eq("isActive", true);
   if (deactivateError) dbError(deactivateError, "Unable to replace source file");
   const { error: fileError } = await db.from("KnowledgeFile").insert({
+    id: createId(),
     knowledgeSourceId: source.id,
     openaiFileId: newFileId,
     contentHash,
@@ -361,6 +374,7 @@ async function syncSingleSource(params: {
   }).eq("id", source.id);
   if (updateError) dbError(updateError, "Unable to update source after sync");
   const { error: syncItemError } = await db.from("SyncItem").insert({
+    id: createId(),
     syncRunId: params.syncRunId,
     knowledgeSourceId: source.id,
     status: source.openaiFileId
@@ -414,6 +428,7 @@ export async function validateAndCreateSource(input: {
   }
 
   const { data: source, error: sourceError } = await getDb().from("KnowledgeSource").insert({
+    id: createId(),
     confluencePageId: page.id,
     sourceUrl,
     title: page.title,
@@ -424,11 +439,13 @@ export async function validateAndCreateSource(input: {
     audience: input.audience,
     classification: input.classification,
     status: SourceStatus.PENDING,
+    updatedAt: new Date().toISOString(),
   }).select("*").single();
   if (sourceError || !source) dbError(sourceError, "Unable to create source");
 
   if (input.userId) {
     const { error } = await getDb().from("AuditEvent").insert({
+      id: createId(),
       type: AuditEventType.SOURCE_CREATED,
       userId: input.userId,
       entityType: "KnowledgeSource",
