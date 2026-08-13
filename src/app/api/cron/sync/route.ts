@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SyncTriggerType } from "@prisma/client";
+import { SyncTriggerType } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import { runSynchronization } from "@/lib/sync/service";
 import { verifyCronSecret } from "@/lib/security";

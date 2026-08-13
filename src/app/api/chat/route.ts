@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { requireAuth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { dbError, getDb } from "@/lib/db";
 import { getEnv, isLocalMockMode } from "@/lib/env";
 import { createTraceId, logError } from "@/lib/logger";
 import {
@@ -44,9 +44,8 @@ export async function POST(request: NextRequest) {
 
     let conversationId = body.conversationId;
     if (conversationId) {
-      const existing = await prisma.conversation.findFirst({
-        where: { id: conversationId, userId: session.user.id },
-      });
+      const { data: existing, error } = await getDb().from("Conversation").select("id").eq("id", conversationId).eq("userId", session.user.id).maybeSingle();
+      if (error) dbError(error, "Unable to load conversation");
       if (!existing) {
         return new Response(
           JSON.stringify({ error: "Conversation not found." }),
@@ -57,29 +56,27 @@ export async function POST(request: NextRequest) {
         );
       }
     } else {
-      const created = await prisma.conversation.create({
-        data: {
-          userId: session.user.id,
-          title: messageContent.slice(0, 80),
-        },
-      });
+      const { data: created, error } = await getDb().from("Conversation").insert({
+        userId: session.user.id,
+        title: messageContent.slice(0, 80),
+      }).select("id").single();
+      if (error || !created) dbError(error, "Unable to create conversation");
       conversationId = created.id;
     }
+    const activeConversationId = conversationId;
+    if (!activeConversationId) {
+      throw new Error("Unable to initialize conversation.");
+    }
 
-    await prisma.message.create({
-      data: {
-        conversationId,
-        role: "user",
-        content: messageContent,
-      },
+    const { error: messageError } = await getDb().from("Message").insert({
+      conversationId: activeConversationId,
+      role: "user",
+      content: messageContent,
     });
+    if (messageError) dbError(messageError, "Unable to save message");
 
-    const history = await prisma.message.findMany({
-      where: { conversationId },
-      orderBy: { createdAt: "asc" },
-      take: 20,
-      select: { role: true, content: true },
-    });
+    const { data: history, error: historyError } = await getDb().from("Message").select("role, content").eq("conversationId", activeConversationId).order("createdAt", { ascending: true }).limit(20);
+    if (historyError) dbError(historyError, "Unable to load conversation history");
 
     const provider = await createRetrievalProvider(isLocalMockMode());
 
@@ -89,13 +86,13 @@ export async function POST(request: NextRequest) {
         let assistantText = "";
         let completion:
           | {
-              openaiResponseId?: string;
-              model: string;
-              latencyMs: number;
-              retrievalCount: number;
-              citations: MappedCitation[];
-              diagnostics?: import("@/lib/assistant/citations").RetrievalDiagnostics;
-            }
+            openaiResponseId?: string;
+            model: string;
+            latencyMs: number;
+            retrievalCount: number;
+            citations: MappedCitation[];
+            diagnostics?: import("@/lib/assistant/citations").RetrievalDiagnostics;
+          }
           | undefined;
 
         controller.enqueue(
@@ -110,12 +107,12 @@ export async function POST(request: NextRequest) {
 
         try {
           for await (const event of provider.streamChat({
-            messages: history.map((m) => ({
+            messages: (history ?? []).map((m: { role: string; content: string }) => ({
               role: m.role as "user" | "assistant",
               content: m.content,
             })),
             traceId,
-            conversationId,
+            conversationId: activeConversationId,
           })) {
             if (event.type === "status") {
               controller.enqueue(encoder.encode(encodeSse(event)));
@@ -139,42 +136,38 @@ export async function POST(request: NextRequest) {
           }
 
           if (completion) {
-            const assistantMessage = await prisma.message.create({
-              data: {
-                conversationId,
-                role: "assistant",
-                content: assistantText,
-                openaiResponseId: completion.openaiResponseId,
-                model: completion.model,
-                latencyMs: completion.latencyMs,
-                retrievalCount: completion.retrievalCount,
-                retrievalDiagnostics: completion.diagnostics ?? undefined,
-              },
-            });
+            const { data: assistantMessage, error: assistantError } = await getDb().from("Message").insert({
+              conversationId,
+              role: "assistant",
+              content: assistantText,
+              openaiResponseId: completion.openaiResponseId,
+              model: completion.model,
+              latencyMs: completion.latencyMs,
+              retrievalCount: completion.retrievalCount,
+              retrievalDiagnostics: completion.diagnostics ?? null,
+            }).select("id").single();
+            if (assistantError || !assistantMessage) dbError(assistantError, "Unable to save assistant message");
 
             if (completion.citations.length > 0) {
-              await prisma.messageCitation.createMany({
-                data: completion.citations.map((c) => ({
-                  messageId: assistantMessage.id,
-                  knowledgeSourceId: c.knowledgeSourceId,
-                  openaiFileId: c.openaiFileId,
-                  title: c.title,
-                  sourceUrl: c.sourceUrl,
-                  confluencePageId: c.confluencePageId,
-                  confluenceVersion: c.confluenceVersion,
-                  spaceKey: c.spaceKey,
-                  confluenceUpdatedAt: c.confluenceUpdatedAt
-                    ? new Date(c.confluenceUpdatedAt)
-                    : undefined,
-                  snippet: c.snippet,
-                })),
-              });
+              const { error } = await getDb().from("MessageCitation").insert(completion.citations.map((c) => ({
+                messageId: assistantMessage.id,
+                knowledgeSourceId: c.knowledgeSourceId,
+                openaiFileId: c.openaiFileId,
+                title: c.title,
+                sourceUrl: c.sourceUrl,
+                confluencePageId: c.confluencePageId,
+                confluenceVersion: c.confluenceVersion,
+                spaceKey: c.spaceKey,
+                confluenceUpdatedAt: c.confluenceUpdatedAt
+                  ? new Date(c.confluenceUpdatedAt).toISOString()
+                  : null,
+                snippet: c.snippet,
+              })));
+              if (error) dbError(error, "Unable to save citations");
             }
 
-            await prisma.conversation.update({
-              where: { id: conversationId },
-              data: { updatedAt: new Date() },
-            });
+            const { error: updateError } = await getDb().from("Conversation").update({ updatedAt: new Date().toISOString() }).eq("id", conversationId);
+            if (updateError) dbError(updateError, "Unable to update conversation");
 
             controller.enqueue(
               encoder.encode(

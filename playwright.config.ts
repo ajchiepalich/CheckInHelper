@@ -19,10 +19,9 @@ export default defineConfig({
     env: {
       LOCAL_AUTH_ENABLED: "true",
       LOCAL_MOCK_MODE: "true",
-      DATABASE_URL:
-        "postgresql://highlands:highlands_dev@localhost:5432/highlands_docs",
-      DIRECT_URL:
-        "postgresql://highlands:highlands_dev@localhost:5432/highlands_docs",
+      SUPABASE_URL: process.env.SUPABASE_URL ?? "https://test.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY:
+        process.env.SUPABASE_SERVICE_ROLE_KEY ?? "test-service-role-key",
       AUTH_SECRET: "playwright-test-secret-minimum-32-chars",
       APP_URL: "http://localhost:3000",
     },

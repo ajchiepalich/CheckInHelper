@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SyncTriggerType } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
 import { getEnv } from "@/lib/env";
 import { runSynchronization } from "@/lib/sync/service";
 import { checkRateLimit, verifyCronSecret } from "@/lib/security";
-import { AuditEventType } from "@prisma/client";
-import { prisma } from "@/lib/db";
+import { AuditEventType, dbError, getDb, SyncTriggerType } from "@/lib/db";
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,13 +24,12 @@ export async function POST(request: NextRequest) {
       retryFailedOnly?: boolean;
     };
 
-    await prisma.auditEvent.create({
-      data: {
-        type: AuditEventType.SYNC_TRIGGERED,
-        userId: session.user.id,
-        metadata: body,
-      },
+    const { error } = await getDb().from("AuditEvent").insert({
+      type: AuditEventType.SYNC_TRIGGERED,
+      userId: session.user.id,
+      metadata: body,
     });
+    if (error) dbError(error, "Unable to record audit event");
 
     const result = await runSynchronization({
       triggerType: body.sourceId

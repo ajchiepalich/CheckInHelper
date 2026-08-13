@@ -11,7 +11,10 @@ export const envSchema = z
       .enum(["development", "test", "production"])
       .default("development"),
     APP_URL: z.string().url().default("http://localhost:3000"),
-    DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+    SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
+    SUPABASE_SERVICE_ROLE_KEY: z
+      .string()
+      .min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
     AUTH_SECRET: z
       .string()
       .min(32, "AUTH_SECRET must be at least 32 characters"),
@@ -76,10 +79,9 @@ export const envSchema = z
 
 export type AppEnv = z.infer<typeof envSchema>;
 
-const BUILD_PLACEHOLDER_DATABASE_URL =
-  "postgresql://build:build@127.0.0.1:5432/build?schema=public";
-const BUILD_PLACEHOLDER_DIRECT_URL =
-  "postgresql://build:build@127.0.0.1:5432/build?schema=public";
+const BUILD_PLACEHOLDER_SUPABASE_URL = "https://build.supabase.co";
+const BUILD_PLACEHOLDER_SUPABASE_SERVICE_ROLE_KEY =
+  "build-time-placeholder-service-role-key";
 const BUILD_PLACEHOLDER_AUTH_SECRET =
   "build-time-placeholder-secret-minimum-32-characters";
 
@@ -94,9 +96,10 @@ function getEnvSource(): NodeJS.ProcessEnv {
 
   return {
     ...process.env,
-    DATABASE_URL:
-      process.env.DATABASE_URL ?? BUILD_PLACEHOLDER_DATABASE_URL,
-    DIRECT_URL: process.env.DIRECT_URL ?? BUILD_PLACEHOLDER_DIRECT_URL,
+    SUPABASE_URL: process.env.SUPABASE_URL ?? BUILD_PLACEHOLDER_SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY:
+      process.env.SUPABASE_SERVICE_ROLE_KEY ??
+      BUILD_PLACEHOLDER_SUPABASE_SERVICE_ROLE_KEY,
     AUTH_SECRET: process.env.AUTH_SECRET ?? BUILD_PLACEHOLDER_AUTH_SECRET,
   };
 }

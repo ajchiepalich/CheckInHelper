@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { prisma } from "@/lib/db";
+import { dbError, getDb } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import {
   buildRetrievalDiagnostics,
@@ -43,21 +43,10 @@ export class OpenAIRetrievalProvider implements RetrievalProvider {
     const started = Date.now();
     yield { type: "status", status: "retrieving" };
 
-    const sources = await prisma.knowledgeSource.findMany({
-      where: { enabled: true, openaiFileId: { not: null } },
-      select: {
-        id: true,
-        title: true,
-        sourceUrl: true,
-        confluencePageId: true,
-        spaceKey: true,
-        lastKnownUpdatedAt: true,
-        lastKnownVersion: true,
-        openaiFileId: true,
-      },
-    });
+    const { data: sources, error } = await getDb().from("KnowledgeSource").select("id, title, sourceUrl, confluencePageId, spaceKey, lastKnownUpdatedAt, lastKnownVersion, openaiFileId").eq("enabled", true).not("openaiFileId", "is", null);
+    if (error) dbError(error, "Unable to load indexed sources");
 
-    const sourceMap = buildSourceFileMap(sources);
+    const sourceMap = buildSourceFileMap(sources ?? []);
 
     const input = request.messages.map((m) => ({
       role: m.role,

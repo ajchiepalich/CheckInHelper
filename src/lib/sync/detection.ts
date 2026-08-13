@@ -1,4 +1,4 @@
-import type { KnowledgeSource } from "@prisma/client";
+import type { KnowledgeSource } from "@/lib/db";
 import { hashContent } from "@/lib/logger";
 
 export type SourceChangeDetection = {

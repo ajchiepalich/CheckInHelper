@@ -28,7 +28,7 @@ The Highlands Documentation Assistant is a retrieval-augmented generation (RAG) 
 
 ### Data
 
-PostgreSQL stores users, conversations, messages, citations, sources, sync runs, feedback, and audit events. Prisma is the ORM.
+Supabase PostgreSQL stores users, conversations, messages, citations, sources, sync runs, feedback, and audit events. Server code accesses it through the Supabase JavaScript client.
 
 ## Request flow (chat)
 

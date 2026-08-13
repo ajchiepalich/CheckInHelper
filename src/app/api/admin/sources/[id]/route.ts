@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { AuditEventType } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { AuditEventType, dbError, getDb } from "@/lib/db";
 
 const patchSchema = z.object({
   enabled: z.boolean().optional(),
@@ -21,32 +20,28 @@ export async function PATCH(
     const { id } = await context.params;
     const body = patchSchema.parse(await request.json());
 
-    const source = await prisma.knowledgeSource.update({
-      where: { id },
-      data: body,
-    });
+    const { data: source, error: sourceError } = await getDb().from("KnowledgeSource").update(body).eq("id", id).select("*").single();
+    if (sourceError || !source) dbError(sourceError, "Unable to update source");
 
     if (body.enabled !== undefined) {
-      await prisma.auditEvent.create({
-        data: {
-          type: body.enabled
-            ? AuditEventType.SOURCE_ENABLED
-            : AuditEventType.SOURCE_DISABLED,
-          userId: session.user.id,
-          entityType: "KnowledgeSource",
-          entityId: id,
-        },
+      const { error } = await getDb().from("AuditEvent").insert({
+        type: body.enabled
+          ? AuditEventType.SOURCE_ENABLED
+          : AuditEventType.SOURCE_DISABLED,
+        userId: session.user.id,
+        entityType: "KnowledgeSource",
+        entityId: id,
       });
+      if (error) dbError(error, "Unable to record audit event");
     } else {
-      await prisma.auditEvent.create({
-        data: {
-          type: AuditEventType.SOURCE_UPDATED,
-          userId: session.user.id,
-          entityType: "KnowledgeSource",
-          entityId: id,
-          metadata: body,
-        },
+      const { error } = await getDb().from("AuditEvent").insert({
+        type: AuditEventType.SOURCE_UPDATED,
+        userId: session.user.id,
+        entityType: "KnowledgeSource",
+        entityId: id,
+        metadata: body,
       });
+      if (error) dbError(error, "Unable to record audit event");
     }
 
     return NextResponse.json(source);
@@ -78,16 +73,16 @@ export async function DELETE(
     const session = await requireAdmin();
     const { id } = await context.params;
 
-    await prisma.knowledgeSource.delete({ where: { id } });
+    const { error: deleteError } = await getDb().from("KnowledgeSource").delete().eq("id", id);
+    if (deleteError) dbError(deleteError, "Unable to delete source");
 
-    await prisma.auditEvent.create({
-      data: {
-        type: AuditEventType.SOURCE_DELETED,
-        userId: session.user.id,
-        entityType: "KnowledgeSource",
-        entityId: id,
-      },
+    const { error } = await getDb().from("AuditEvent").insert({
+      type: AuditEventType.SOURCE_DELETED,
+      userId: session.user.id,
+      entityType: "KnowledgeSource",
+      entityId: id,
     });
+    if (error) dbError(error, "Unable to record audit event");
 
     return NextResponse.json({ ok: true });
   } catch (error) {

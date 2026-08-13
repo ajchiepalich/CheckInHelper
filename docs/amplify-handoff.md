@@ -35,23 +35,21 @@ Add in **Amplify → App settings → Environment variables** (production branch
 | `NODE_ENV` | `production` | |
 | `LOCAL_MOCK_MODE` | `false` | Required in prod |
 | `LOCAL_AUTH_ENABLED` | `false` | Required in prod |
-| `DATABASE_URL` | *(from Supabase)* | Transaction pooler, port **6543**, suffix `?pgbouncer=true` |
-| `DIRECT_URL` | *(from Supabase)* | Session pooler, port **5432** |
+| `SUPABASE_URL` | *(from Supabase)* | Project URL from **Project Settings → API** |
+| `SUPABASE_SERVICE_ROLE_KEY` | *(from Supabase)* | Server-only service-role key from **Project Settings → API** |
 | `AUTH_SECRET` | *(generate)* | Min 32 random characters |
 | `OPENAI_API_KEY` | *(from OpenAI)* | |
 | `OPENAI_VECTOR_STORE_ID` | *(from OpenAI)* | e.g. `vs_...` |
 | `ATLASSIAN_BASE_URL` | `https://churchofthehighlands.atlassian.net/` | Trailing slash OK |
 | `CRON_SECRET` | *(generate)* | Same value used in EventBridge job |
 
-**Supabase connection strings:** [Project Settings → Database](https://supabase.com/dashboard/project/vsuhzudjyclfaojwrhrd/settings/database)
+**Supabase API settings:** [Project Settings → API](https://supabase.com/dashboard/project/vsuhzudjyclfaojwrhrd/settings/api)
 
-Use the **pooler host** (`aws-0-ca-central-1.pooler.supabase.com`), not `db.vsuhzudjyclfaojwrhrd.supabase.co`, if direct host does not resolve.
-
-Example shape (replace password from Supabase dashboard):
+Example shape:
 
 ```text
-DATABASE_URL=postgresql://postgres.vsuhzudjyclfaojwrhrd:[PASSWORD]@aws-0-ca-central-1.pooler.supabase.com:6543/postgres?pgbouncer=true
-DIRECT_URL=postgresql://postgres.vsuhzudjyclfaojwrhrd:[PASSWORD]@aws-0-ca-central-1.pooler.supabase.com:5432/postgres
+SUPABASE_URL=https://vsuhzudjyclfaojwrhrd.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=[SERVICE_ROLE_KEY]
 ```
 
 ### Optional
@@ -67,7 +65,7 @@ DIRECT_URL=postgresql://postgres.vsuhzudjyclfaojwrhrd:[PASSWORD]@aws-0-ca-centra
 
 ### Do not set
 
-- Skip Supabase Dashboard **GitHub migration integration** — schema is Prisma-managed.
+- Apply reviewed SQL files in [supabase/migrations](../supabase/migrations) before deploying application code.
 
 ---
 
@@ -85,7 +83,7 @@ DIRECT_URL=postgresql://postgres.vsuhzudjyclfaojwrhrd:[PASSWORD]@aws-0-ca-centra
 ## Phase 4 — First deploy & verify
 
 - [ ] Trigger deploy (push to `main` or **Redeploy this version**)
-- [ ] Build succeeds through: `prisma generate` → `db:migrate:deploy` → `npm run build`
+- [ ] Build succeeds through: `npm run build`
 - [ ] Health check:
 
 ```bash

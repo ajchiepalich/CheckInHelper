@@ -1,9 +1,7 @@
 import NextAuth from "next-auth";
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import Credentials from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import { UserRole } from "@prisma/client";
-import { prisma } from "@/lib/db";
+import { UserRole, type UserRole as UserRoleValue, dbError, getDb } from "@/lib/db";
 import { getEnv, isEntraConfigured, isLocalAuthEnabled } from "@/lib/env";
 
 declare module "next-auth" {
@@ -13,19 +11,19 @@ declare module "next-auth" {
       email: string;
       name?: string | null;
       image?: string | null;
-      role: UserRole;
+      role: UserRoleValue;
     };
   }
 
   interface User {
-    role: UserRole;
+    role: UserRoleValue;
   }
 }
 
 declare module "@auth/core/jwt" {
   interface JWT {
     id?: string;
-    role?: UserRole;
+    role?: UserRoleValue;
   }
 }
 
@@ -65,15 +63,16 @@ function buildProviders() {
             ? UserRole.ADMIN
             : UserRole.STAFF;
 
-          const user = await prisma.user.upsert({
-            where: { email },
-            update: { role },
-            create: {
+          const { data: user, error } = await getDb()
+            .from("User")
+            .upsert({
               email,
               name: role === UserRole.ADMIN ? "Local Admin" : "Local Staff",
               role,
-            },
-          });
+            }, { onConflict: "email" })
+            .select("id, email, name, image, role")
+            .single();
+          if (error || !user) dbError(error, "Unable to create local user");
 
           return user;
         },
@@ -85,7 +84,6 @@ function buildProviders() {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
   trustHost: true,
   secret: process.env.AUTH_SECRET,
@@ -99,10 +97,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id;
         token.role = user.role;
       } else if (token.email) {
-        const dbUser = await prisma.user.findUnique({
-          where: { email: token.email },
-          select: { id: true, role: true },
-        });
+        const { data: dbUser, error } = await getDb()
+          .from("User")
+          .select("id, role")
+          .eq("email", token.email)
+          .maybeSingle();
+        if (error) dbError(error, "Unable to load user");
         if (dbUser) {
           token.id = dbUser.id;
           token.role = dbUser.role;
@@ -131,15 +131,17 @@ export type AppSession = {
 };
 
 async function getDefaultUser() {
-  return prisma.user.upsert({
-    where: { email: DEFAULT_USER_EMAIL },
-    update: { role: UserRole.ADMIN },
-    create: {
+  const { data, error } = await getDb()
+    .from("User")
+    .upsert({
       email: DEFAULT_USER_EMAIL,
       name: "Guest User",
       role: UserRole.ADMIN,
-    },
-  });
+    }, { onConflict: "email" })
+    .select("id, email, name, image, role")
+    .single();
+  if (error || !data) dbError(error, "Unable to create default user");
+  return data;
 }
 
 export async function requireAuth(): Promise<AppSession> {

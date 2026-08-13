@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { FeedbackHelpful } from "@prisma/client";
+import { FeedbackHelpful, dbError, getDb } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
 import { FEEDBACK_MAX_COMMENT_LENGTH } from "@/lib/security";
 
 const feedbackSchema = z.object({
@@ -19,36 +18,31 @@ export async function POST(request: NextRequest) {
     const session = await requireAuth();
     const body = feedbackSchema.parse(await request.json());
 
-    const message = await prisma.message.findFirst({
-      where: {
-        id: body.messageId,
-        conversationId: body.conversationId,
-        conversation: { userId: session.user.id },
-        role: "assistant",
-      },
-    });
+    const { data: conversation, error: conversationError } = await getDb().from("Conversation").select("id").eq("id", body.conversationId).eq("userId", session.user.id).maybeSingle();
+    if (conversationError) dbError(conversationError, "Unable to load conversation");
+    const { data: message, error: messageError } = await getDb().from("Message").select("id").eq("id", body.messageId).eq("conversationId", body.conversationId).eq("role", "assistant").maybeSingle();
+    if (messageError) dbError(messageError, "Unable to load message");
 
-    if (!message) {
+    if (!conversation || !message) {
       return NextResponse.json(
         { error: "Message not found." },
         { status: 404 },
       );
     }
 
-    const feedback = await prisma.answerFeedback.create({
-      data: {
-        userId: session.user.id,
-        conversationId: body.conversationId,
-        messageId: body.messageId,
-        helpful: body.helpful,
-        reason: body.reason,
-        comments: body.comments,
-        suggestsDocumentationGap:
-          body.suggestsDocumentationGap ??
-          (body.helpful === FeedbackHelpful.NOT_HELPFUL ||
-            body.helpful === FeedbackHelpful.INCORRECT),
-      },
-    });
+    const { data: feedback, error } = await getDb().from("AnswerFeedback").insert({
+      userId: session.user.id,
+      conversationId: body.conversationId,
+      messageId: body.messageId,
+      helpful: body.helpful,
+      reason: body.reason,
+      comments: body.comments,
+      suggestsDocumentationGap:
+        body.suggestsDocumentationGap ??
+        (body.helpful === FeedbackHelpful.NOT_HELPFUL ||
+          body.helpful === FeedbackHelpful.INCORRECT),
+    }).select("id").single();
+    if (error || !feedback) dbError(error, "Unable to save feedback");
 
     return NextResponse.json({ id: feedback.id });
   } catch (error) {

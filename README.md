@@ -5,7 +5,7 @@ Production-ready internal AI documentation assistant for Church of the Highlands
 ## Stack
 
 - Next.js App Router, React, TypeScript, Tailwind CSS
-- PostgreSQL + Prisma
+- Supabase PostgreSQL + Supabase JavaScript client
 - NextAuth with Microsoft Entra ID and local development auth
 - OpenAI official Node SDK (Responses API, vector stores, file search)
 - Atlassian Confluence Cloud REST API
@@ -54,7 +54,7 @@ Open [http://localhost:3000/login](http://localhost:3000/login) and sign in with
 | `npm run typecheck` | TypeScript                                              |
 | `npm test`          | Vitest unit/integration tests                           |
 | `npm run test:e2e`  | Playwright end-to-end tests                             |
-| `npm run db:push`   | Apply Prisma schema                                     |
+| `npm run db:types`  | Generate Supabase TypeScript database types (optional)  |
 | `npm run db:seed`   | Seed local users and fixture sources                    |
 | `npm run sync`      | CLI sync (`--dry-run`, `--source=ID`, `--retry-failed`) |
 
@@ -62,8 +62,8 @@ Open [http://localhost:3000/login](http://localhost:3000/login) and sign in with
 
 See [`.env.example`](./.env.example). Required for production:
 
-- `DATABASE_URL` — Supabase transaction pooler (or direct Postgres URL)
-- `DIRECT_URL` — Supabase direct connection (Prisma migrations)
+- `SUPABASE_URL` — Supabase project URL
+- `SUPABASE_SERVICE_ROLE_KEY` — server-only Supabase service-role key
 - `AUTH_SECRET`
 - `ENTRA_CLIENT_ID`, `ENTRA_CLIENT_SECRET`, `ENTRA_TENANT_ID`
 - `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_VECTOR_STORE_ID`
@@ -133,7 +133,7 @@ Production: **https://helper.highlands.io**
 1. Connect the **`highlands`** GitHub repo in Amplify (branch `main`).
 2. Add environment variables in Amplify Console (see [docs/amplify.md](./docs/amplify.md)).
 3. Point custom domain **`helper.highlands.io`** at the Amplify app.
-4. Deploy — `amplify.yml` runs Prisma migrations against Supabase during build.
+4. Apply SQL migrations from [supabase/migrations](supabase/migrations) through the Supabase CLI or SQL Editor, then deploy.
 5. Register Confluence sources and run sync (see [docs/amplify.md](./docs/amplify.md)).
 
 Full walkthrough: [docs/amplify.md](./docs/amplify.md) and [docs/supabase.md](./docs/supabase.md).

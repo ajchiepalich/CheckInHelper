@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { requireRole } from "@/lib/security";
-import { UserRole } from "@prisma/client";
+import { UserRole } from "@/lib/db";
 import { NO_SOURCE_FALLBACK } from "@/lib/assistant/prompts";
 
 describe("authorization", () => {

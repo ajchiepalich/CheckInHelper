@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { getDiagnosticsSummary } from "@/lib/logger";
-import { prisma } from "@/lib/db";
+import { getDb } from "@/lib/db";
 
 export async function GET() {
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    const { error } = await getDb().from("SyncLock").select("id").limit(1);
+    if (error) throw error;
     return NextResponse.json({
       status: "ok",
       timestamp: new Date().toISOString(),

@@ -7,9 +7,9 @@ import {
   SyncRunStatus,
   SyncTriggerType,
   type KnowledgeSource,
-  type Prisma,
-} from "@prisma/client";
-import { prisma } from "@/lib/db";
+  dbError,
+  getDb,
+} from "@/lib/db";
 import { getEnv, isLocalMockMode } from "@/lib/env";
 import { buildMarkdownDocument } from "@/lib/confluence/markdown";
 import {
@@ -41,69 +41,58 @@ export type SyncResult = {
 };
 
 async function acquireSyncLock(syncRunId: string): Promise<boolean> {
-  const lock = await prisma.syncLock.upsert({
-    where: { id: "global" },
-    create: { id: "global", lockedAt: new Date(), syncRunId },
-    update: {},
-  });
+  const db = getDb();
+  const { data: lock, error } = await db.from("SyncLock").select("lockedAt, syncRunId").eq("id", "global").maybeSingle();
+  if (error) dbError(error, "Unable to read sync lock");
 
-  if (lock.lockedAt && lock.syncRunId && lock.syncRunId !== syncRunId) {
-    const ageMs = Date.now() - lock.lockedAt.getTime();
+  if (lock?.lockedAt && lock.syncRunId && lock.syncRunId !== syncRunId) {
+    const ageMs = Date.now() - new Date(lock.lockedAt).getTime();
     if (ageMs < 60 * 60 * 1000) {
       return false;
     }
   }
 
-  await prisma.syncLock.update({
-    where: { id: "global" },
-    data: { lockedAt: new Date(), syncRunId },
-  });
+  const { error: updateError } = await db.from("SyncLock").upsert({ id: "global", lockedAt: new Date().toISOString(), syncRunId }, { onConflict: "id" });
+  if (updateError) dbError(updateError, "Unable to acquire sync lock");
   return true;
 }
 
 async function releaseSyncLock(syncRunId: string): Promise<void> {
-  await prisma.syncLock.updateMany({
-    where: { id: "global", syncRunId },
-    data: { lockedAt: null, syncRunId: null },
-  });
+  const { error } = await getDb().from("SyncLock").update({ lockedAt: null, syncRunId: null }).eq("id", "global").eq("syncRunId", syncRunId);
+  if (error) dbError(error, "Unable to release sync lock");
 }
 
 export async function runSynchronization(
   options: SyncOptions,
 ): Promise<SyncResult> {
   const env = getEnv();
-  const syncRun = await prisma.syncRun.create({
-    data: {
-      status: SyncRunStatus.RUNNING,
-      triggerType: options.triggerType,
-      triggeredById: options.triggeredById,
-      dryRun: options.dryRun ?? false,
-      lockAcquired: false,
-    },
-  });
+  const { data: syncRun, error: syncRunError } = await getDb().from("SyncRun").insert({
+    status: SyncRunStatus.RUNNING,
+    triggerType: options.triggerType,
+    triggeredById: options.triggeredById,
+    dryRun: options.dryRun ?? false,
+    lockAcquired: false,
+  }).select("id").single();
+  if (syncRunError || !syncRun) dbError(syncRunError, "Unable to create sync run");
 
   const isFullRun = !options.sourceId;
   if (isFullRun) {
     const acquired = await acquireSyncLock(syncRun.id);
     if (!acquired) {
-      await prisma.syncRun.update({
-        where: { id: syncRun.id },
-        data: {
-          status: SyncRunStatus.CANCELLED,
-          finishedAt: new Date(),
-          errorSummary: "Another sync run is already in progress.",
-        },
-      });
+      const { error } = await getDb().from("SyncRun").update({
+        status: SyncRunStatus.CANCELLED,
+        finishedAt: new Date().toISOString(),
+        errorSummary: "Another sync run is already in progress.",
+      }).eq("id", syncRun.id);
+      if (error) dbError(error, "Unable to cancel sync run");
       return {
         syncRunId: syncRun.id,
         status: SyncRunStatus.CANCELLED,
         summary: { added: 0, updated: 0, unchanged: 0, failed: 0 },
       };
     }
-    await prisma.syncRun.update({
-      where: { id: syncRun.id },
-      data: { lockAcquired: true },
-    });
+    const { error } = await getDb().from("SyncRun").update({ lockAcquired: true }).eq("id", syncRun.id);
+    if (error) dbError(error, "Unable to update sync run");
   }
 
   const confluence = createConfluenceService({
@@ -113,20 +102,11 @@ export async function runSynchronization(
 
   const vectorStore = isLocalMockMode() ? null : new OpenAIVectorStoreService();
 
-  const where: Prisma.KnowledgeSourceWhereInput = {
-    enabled: true,
-    sourceType: "EXPLICIT_PAGE",
-  };
-
-  if (options.sourceId) {
-    where.id = options.sourceId;
-  }
-
-  if (options.retryFailedOnly) {
-    where.status = { in: [SourceStatus.FAILED, SourceStatus.UNAVAILABLE] };
-  }
-
-  const sources = await prisma.knowledgeSource.findMany({ where });
+  let query = getDb().from("KnowledgeSource").select("*").eq("enabled", true).eq("sourceType", "EXPLICIT_PAGE");
+  if (options.sourceId) query = query.eq("id", options.sourceId);
+  if (options.retryFailedOnly) query = query.in("status", [SourceStatus.FAILED, SourceStatus.UNAVAILABLE]);
+  const { data: sources, error: sourcesError } = await query;
+  if (sourcesError) dbError(sourcesError, "Unable to load sources");
 
   let added = 0;
   let updated = 0;
@@ -137,7 +117,7 @@ export async function runSynchronization(
   await mkdir(tempDir, { recursive: true });
 
   try {
-    for (const source of sources) {
+    for (const source of (sources ?? []) as KnowledgeSource[]) {
       try {
         const result = await syncSingleSource({
           source,
@@ -160,24 +140,21 @@ export async function runSynchronization(
           syncRunId: syncRun.id,
           sourceId: source.id,
         });
-        await prisma.syncItem.create({
-          data: {
-            syncRunId: syncRun.id,
-            knowledgeSourceId: source.id,
-            status: SyncItemStatus.FAILED,
-            message:
-              error instanceof Error ? error.message : "Unknown sync error",
-          },
+        const { error: itemError } = await getDb().from("SyncItem").insert({
+          syncRunId: syncRun.id,
+          knowledgeSourceId: source.id,
+          status: SyncItemStatus.FAILED,
+          message:
+            error instanceof Error ? error.message : "Unknown sync error",
         });
-        await prisma.knowledgeSource.update({
-          where: { id: source.id },
-          data: {
-            status: SourceStatus.FAILED,
-            lastError:
-              error instanceof Error ? error.message : "Unknown sync error",
-            lastAttemptedSyncAt: new Date(),
-          },
-        });
+        if (itemError) dbError(itemError, "Unable to create sync item");
+        const { error: sourceError } = await getDb().from("KnowledgeSource").update({
+          status: SourceStatus.FAILED,
+          lastError:
+            error instanceof Error ? error.message : "Unknown sync error",
+          lastAttemptedSyncAt: new Date().toISOString(),
+        }).eq("id", source.id);
+        if (sourceError) dbError(sourceError, "Unable to update source");
       }
     }
 
@@ -186,33 +163,30 @@ export async function runSynchronization(
         ? SyncRunStatus.FAILED
         : SyncRunStatus.COMPLETED;
 
-    await prisma.syncRun.update({
-      where: { id: syncRun.id },
-      data: {
-        status: finalStatus,
-        finishedAt: new Date(),
-        addedCount: added,
-        updatedCount: updated,
-        unchangedCount: unchanged,
-        failedCount: failed,
-        errorSummary:
-          failed > 0 ? `${failed} source(s) failed during sync.` : null,
-      },
-    });
+    const { error: finalError } = await getDb().from("SyncRun").update({
+      status: finalStatus,
+      finishedAt: new Date().toISOString(),
+      addedCount: added,
+      updatedCount: updated,
+      unchangedCount: unchanged,
+      failedCount: failed,
+      errorSummary:
+        failed > 0 ? `${failed} source(s) failed during sync.` : null,
+    }).eq("id", syncRun.id);
+    if (finalError) dbError(finalError, "Unable to complete sync run");
 
     if (options.triggeredById) {
-      await prisma.auditEvent.create({
-        data: {
-          type:
-            finalStatus === SyncRunStatus.COMPLETED
-              ? AuditEventType.SYNC_COMPLETED
-              : AuditEventType.SYNC_FAILED,
-          userId: options.triggeredById,
-          entityType: "SyncRun",
-          entityId: syncRun.id,
-          metadata: { added, updated, unchanged, failed },
-        },
+      const { error } = await getDb().from("AuditEvent").insert({
+        type:
+          finalStatus === SyncRunStatus.COMPLETED
+            ? AuditEventType.SYNC_COMPLETED
+            : AuditEventType.SYNC_FAILED,
+        userId: options.triggeredById,
+        entityType: "SyncRun",
+        entityId: syncRun.id,
+        metadata: { added, updated, unchanged, failed },
       });
+      if (error) dbError(error, "Unable to record audit event");
     }
 
     logInfo("sync.completed", {
@@ -261,22 +235,19 @@ async function syncSingleSource(params: {
           ? SourceStatus.FAILED
           : SourceStatus.UNAVAILABLE;
 
-      await prisma.knowledgeSource.update({
-        where: { id: source.id },
-        data: {
-          status,
-          lastError: error.message,
-          lastAttemptedSyncAt: new Date(),
-        },
+      const { error: sourceError } = await getDb().from("KnowledgeSource").update({
+        status,
+        lastError: error.message,
+        lastAttemptedSyncAt: new Date().toISOString(),
+      }).eq("id", source.id);
+      if (sourceError) dbError(sourceError, "Unable to update unavailable source");
+      const { error: itemError } = await getDb().from("SyncItem").insert({
+        syncRunId: params.syncRunId,
+        knowledgeSourceId: source.id,
+        status: SyncItemStatus.FAILED,
+        message: error.message,
       });
-      await prisma.syncItem.create({
-        data: {
-          syncRunId: params.syncRunId,
-          knowledgeSourceId: source.id,
-          status: SyncItemStatus.FAILED,
-          message: error.message,
-        },
-      });
+      if (itemError) dbError(itemError, "Unable to record unavailable source");
       return SyncItemStatus.FAILED;
     }
     throw error;
@@ -307,36 +278,32 @@ async function syncSingleSource(params: {
   const change = detectSourceChange(source, page.version, markdown);
 
   if (!change.changed) {
-    await prisma.knowledgeSource.update({
-      where: { id: source.id },
-      data: {
-        status: SourceStatus.UNCHANGED,
-        lastAttemptedSyncAt: new Date(),
-        lastError: conversion.warnings.length
-          ? conversion.warnings.join("; ")
-          : null,
-      },
+    const { error: sourceError } = await getDb().from("KnowledgeSource").update({
+      status: SourceStatus.UNCHANGED,
+      lastAttemptedSyncAt: new Date().toISOString(),
+      lastError: conversion.warnings.length
+        ? conversion.warnings.join("; ")
+        : null,
+    }).eq("id", source.id);
+    if (sourceError) dbError(sourceError, "Unable to update unchanged source");
+    const { error: itemError } = await getDb().from("SyncItem").insert({
+      syncRunId: params.syncRunId,
+      knowledgeSourceId: source.id,
+      status: SyncItemStatus.UNCHANGED,
+      message: "No changes detected.",
     });
-    await prisma.syncItem.create({
-      data: {
-        syncRunId: params.syncRunId,
-        knowledgeSourceId: source.id,
-        status: SyncItemStatus.UNCHANGED,
-        message: "No changes detected.",
-      },
-    });
+    if (itemError) dbError(itemError, "Unable to record unchanged source");
     return SyncItemStatus.UNCHANGED;
   }
 
   if (params.dryRun) {
-    await prisma.syncItem.create({
-      data: {
-        syncRunId: params.syncRunId,
-        knowledgeSourceId: source.id,
-        status: SyncItemStatus.SKIPPED,
-        message: `Dry run: would ${source.openaiFileId ? "update" : "add"} source.`,
-      },
+    const { error } = await getDb().from("SyncItem").insert({
+      syncRunId: params.syncRunId,
+      knowledgeSourceId: source.id,
+      status: SyncItemStatus.SKIPPED,
+      message: `Dry run: would ${source.openaiFileId ? "update" : "add"} source.`,
     });
+    if (error) dbError(error, "Unable to record dry run item");
     return source.openaiFileId ? SyncItemStatus.UPDATED : SyncItemStatus.ADDED;
   }
 
@@ -365,55 +332,45 @@ async function syncSingleSource(params: {
     newFileId = upload.fileId;
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.knowledgeFile.updateMany({
-      where: { knowledgeSourceId: source.id, isActive: true },
-      data: { isActive: false, replacedAt: new Date() },
-    });
-
-    await tx.knowledgeFile.create({
-      data: {
-        knowledgeSourceId: source.id,
-        openaiFileId: newFileId,
-        contentHash,
-        version: page.version,
-        isActive: true,
-      },
-    });
-
-    await tx.knowledgeSource.update({
-      where: { id: source.id },
-      data: {
-        title: page.title,
-        sourceUrl: page.webUrl,
-        spaceId: page.spaceId,
-        spaceKey: page.spaceKey,
-        lastKnownVersion: page.version,
-        lastKnownUpdatedAt: new Date(page.updatedAt),
-        contentHash,
-        openaiFileId: newFileId,
-        status: SourceStatus.SYNCED,
-        lastSuccessfulSyncAt: new Date(),
-        lastAttemptedSyncAt: new Date(),
-        lastError: conversion.warnings.length
-          ? conversion.warnings.join("; ")
-          : null,
-      },
-    });
-
-    await tx.syncItem.create({
-      data: {
-        syncRunId: params.syncRunId,
-        knowledgeSourceId: source.id,
-        status: source.openaiFileId
-          ? SyncItemStatus.UPDATED
-          : SyncItemStatus.ADDED,
-        previousFileId: previousFileId,
-        newFileId,
-        message: change.reason,
-      },
-    });
+  const db = getDb();
+  const { error: deactivateError } = await db.from("KnowledgeFile").update({ isActive: false, replacedAt: new Date().toISOString() }).eq("knowledgeSourceId", source.id).eq("isActive", true);
+  if (deactivateError) dbError(deactivateError, "Unable to replace source file");
+  const { error: fileError } = await db.from("KnowledgeFile").insert({
+    knowledgeSourceId: source.id,
+    openaiFileId: newFileId,
+    contentHash,
+    version: page.version,
+    isActive: true,
   });
+  if (fileError) dbError(fileError, "Unable to create source file");
+  const { error: updateError } = await db.from("KnowledgeSource").update({
+    title: page.title,
+    sourceUrl: page.webUrl,
+    spaceId: page.spaceId,
+    spaceKey: page.spaceKey,
+    lastKnownVersion: page.version,
+    lastKnownUpdatedAt: new Date(page.updatedAt).toISOString(),
+    contentHash,
+    openaiFileId: newFileId,
+    status: SourceStatus.SYNCED,
+    lastSuccessfulSyncAt: new Date().toISOString(),
+    lastAttemptedSyncAt: new Date().toISOString(),
+    lastError: conversion.warnings.length
+      ? conversion.warnings.join("; ")
+      : null,
+  }).eq("id", source.id);
+  if (updateError) dbError(updateError, "Unable to update source after sync");
+  const { error: syncItemError } = await db.from("SyncItem").insert({
+    syncRunId: params.syncRunId,
+    knowledgeSourceId: source.id,
+    status: source.openaiFileId
+      ? SyncItemStatus.UPDATED
+      : SyncItemStatus.ADDED,
+    previousFileId: previousFileId,
+    newFileId,
+    message: change.reason,
+  });
+  if (syncItemError) dbError(syncItemError, "Unable to record sync result");
 
   if (
     !params.mockMode &&
@@ -450,41 +407,38 @@ export async function validateAndCreateSource(input: {
   const sourceUrl =
     parsed.kind === "external" ? parsed.url : page.webUrl;
 
-  const existing = await prisma.knowledgeSource.findFirst({
-    where: { confluencePageId: page.id, sourceType: "EXPLICIT_PAGE" },
-  });
+  const { data: existing, error: existingError } = await getDb().from("KnowledgeSource").select("id").eq("confluencePageId", page.id).eq("sourceType", "EXPLICIT_PAGE").maybeSingle();
+  if (existingError) dbError(existingError, "Unable to validate source");
   if (existing) {
     throw new Error("This Confluence page is already registered as a source.");
   }
 
-  const source = await prisma.knowledgeSource.create({
-    data: {
-      confluencePageId: page.id,
-      sourceUrl,
-      title: page.title,
-      spaceId: page.spaceId,
-      spaceKey: page.spaceKey,
-      sourceType: "EXPLICIT_PAGE",
-      category: input.category,
-      audience: input.audience,
-      classification: input.classification,
-      status: SourceStatus.PENDING,
-    },
-  });
+  const { data: source, error: sourceError } = await getDb().from("KnowledgeSource").insert({
+    confluencePageId: page.id,
+    sourceUrl,
+    title: page.title,
+    spaceId: page.spaceId,
+    spaceKey: page.spaceKey,
+    sourceType: "EXPLICIT_PAGE",
+    category: input.category,
+    audience: input.audience,
+    classification: input.classification,
+    status: SourceStatus.PENDING,
+  }).select("*").single();
+  if (sourceError || !source) dbError(sourceError, "Unable to create source");
 
   if (input.userId) {
-    await prisma.auditEvent.create({
-      data: {
-        type: AuditEventType.SOURCE_CREATED,
-        userId: input.userId,
-        entityType: "KnowledgeSource",
-        entityId: source.id,
-        metadata: {
-          title: source.title,
-          confluencePageId: source.confluencePageId,
-        },
+    const { error } = await getDb().from("AuditEvent").insert({
+      type: AuditEventType.SOURCE_CREATED,
+      userId: input.userId,
+      entityType: "KnowledgeSource",
+      entityId: source.id,
+      metadata: {
+        title: source.title,
+        confluencePageId: source.confluencePageId,
       },
     });
+    if (error) dbError(error, "Unable to record source audit event");
   }
 
   return source;

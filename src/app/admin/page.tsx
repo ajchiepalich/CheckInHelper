@@ -1,6 +1,5 @@
-import { FeedbackHelpful, SourceStatus } from "@prisma/client";
+import { FeedbackHelpful, SourceStatus, dbError, getDb } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
-import { prisma } from "@/lib/db";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDateTime } from "@/lib/utils";
@@ -11,68 +10,27 @@ export default async function AdminDashboardPage() {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const [
-    enabledSources,
-    failedSources,
-    unavailableSources,
-    indexedFiles,
-    negativeFeedback,
-    lastSuccessfulSync,
-    latestSync,
-    topCitations,
-    recentUnhelpful,
-  ] = await Promise.all([
-    prisma.knowledgeSource.count({ where: { enabled: true } }),
-    prisma.knowledgeSource.count({ where: { status: SourceStatus.FAILED } }),
-    prisma.knowledgeSource.count({
-      where: { status: SourceStatus.UNAVAILABLE },
-    }),
-    prisma.knowledgeFile.count({ where: { isActive: true } }),
-    prisma.answerFeedback.count({
-      where: {
-        helpful: {
-          in: [FeedbackHelpful.NOT_HELPFUL, FeedbackHelpful.INCORRECT],
-        },
-        createdAt: { gte: thirtyDaysAgo },
-      },
-    }),
-    prisma.syncRun.findFirst({
-      where: { status: "COMPLETED" },
-      orderBy: { finishedAt: "desc" },
-    }),
-    prisma.syncRun.findFirst({ orderBy: { startedAt: "desc" } }),
-    prisma.messageCitation.groupBy({
-      by: ["knowledgeSourceId"],
-      _count: { _all: true },
-      orderBy: { _count: { knowledgeSourceId: "desc" } },
-      take: 5,
-    }),
-    prisma.answerFeedback.findMany({
-      where: {
-        helpful: {
-          in: [FeedbackHelpful.NOT_HELPFUL, FeedbackHelpful.INCORRECT],
-        },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-      include: {
-        message: { select: { content: true } },
-      },
-    }),
+  const db = getDb();
+  const [enabled, failed, unavailable, indexed, negative, successful, latest, citations, unhelpful] = await Promise.all([
+    db.from("KnowledgeSource").select("id", { count: "exact", head: true }).eq("enabled", true),
+    db.from("KnowledgeSource").select("id", { count: "exact", head: true }).eq("status", SourceStatus.FAILED),
+    db.from("KnowledgeSource").select("id", { count: "exact", head: true }).eq("status", SourceStatus.UNAVAILABLE),
+    db.from("KnowledgeFile").select("id", { count: "exact", head: true }).eq("isActive", true),
+    db.from("AnswerFeedback").select("id", { count: "exact", head: true }).in("helpful", [FeedbackHelpful.NOT_HELPFUL, FeedbackHelpful.INCORRECT]).gte("createdAt", thirtyDaysAgo.toISOString()),
+    db.from("SyncRun").select("*").eq("status", "COMPLETED").order("finishedAt", { ascending: false }).limit(1).maybeSingle(),
+    db.from("SyncRun").select("*").order("startedAt", { ascending: false }).limit(1).maybeSingle(),
+    db.from("MessageCitation").select("knowledgeSourceId"),
+    db.from("AnswerFeedback").select("id, helpful, Message(content)").in("helpful", [FeedbackHelpful.NOT_HELPFUL, FeedbackHelpful.INCORRECT]).order("createdAt", { ascending: false }).limit(5),
   ]);
-
-  const citedSourceIds = topCitations
-    .map((c) => c.knowledgeSourceId)
-    .filter((id): id is string => Boolean(id));
-
-  const citedSources = citedSourceIds.length
-    ? await prisma.knowledgeSource.findMany({
-        where: { id: { in: citedSourceIds } },
-        select: { id: true, title: true },
-      })
-    : [];
-
-  const citedMap = new Map(citedSources.map((s) => [s.id, s.title]));
+  for (const result of [enabled, failed, unavailable, indexed, negative, successful, latest, citations, unhelpful]) if (result.error) dbError(result.error, "Unable to load dashboard data");
+  const counts = new Map<string, number>();
+  for (const citation of citations.data ?? []) if (citation.knowledgeSourceId) counts.set(citation.knowledgeSourceId, (counts.get(citation.knowledgeSourceId) ?? 0) + 1);
+  const topCitations = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const citedSourceIds = topCitations.map(([id]) => id);
+  const { data: citedSources, error: sourcesError } = citedSourceIds.length ? await db.from("KnowledgeSource").select("id, title").in("id", citedSourceIds) : { data: [], error: null };
+  if (sourcesError) dbError(sourcesError, "Unable to load cited sources");
+  const citedMap = new Map<string, string>((citedSources ?? []).map((s: { id: string; title: string }) => [s.id, s.title]));
+  const enabledSources = enabled.count ?? 0; const failedSources = failed.count ?? 0; const unavailableSources = unavailable.count ?? 0; const indexedFiles = indexed.count ?? 0; const negativeFeedback = negative.count ?? 0; const lastSuccessfulSync = successful.data; const latestSync = latest.data; const recentUnhelpful = unhelpful.data ?? [];
 
   const stats = [
     { label: "Enabled sources", value: enabledSources },
@@ -141,17 +99,17 @@ export default async function AdminDashboardPage() {
               </p>
             ) : (
               <ul className="space-y-2 text-sm">
-                {topCitations.map((item) => (
+                {topCitations.map(([sourceId, count]) => (
                   <li
-                    key={item.knowledgeSourceId ?? "unknown"}
+                    key={sourceId}
                     className="flex justify-between gap-4"
                   >
                     <span>
-                      {citedMap.get(item.knowledgeSourceId ?? "") ??
+                      {citedMap.get(sourceId) ??
                         "Unknown source"}
                     </span>
                     <span className="font-semibold text-[var(--color-primary)]">
-                      {item._count._all}
+                      {count}
                     </span>
                   </li>
                 ))}
@@ -171,7 +129,7 @@ export default async function AdminDashboardPage() {
               </p>
             ) : (
               <ul className="space-y-4">
-                {recentUnhelpful.map((item) => (
+                {recentUnhelpful.map((item: { id: string; helpful: string; Message: { content: string } }) => (
                   <li
                     key={item.id}
                     className="rounded-xl border border-[var(--color-border)] p-4"
@@ -180,7 +138,7 @@ export default async function AdminDashboardPage() {
                       {item.helpful.replace("_", " ")}
                     </p>
                     <p className="mt-2 text-sm">
-                      {item.message.content.slice(0, 240)}
+                      {item.Message.content.slice(0, 240)}
                     </p>
                   </li>
                 ))}

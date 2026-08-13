@@ -9,7 +9,7 @@ Production URL: **https://helper.highlands.io**
 1. In [AWS Amplify Console](https://console.aws.amazon.com/amplify/), choose **Create new app → Host web app**.
 2. Connect GitHub and select the **`highlands`** organization repository for this project.
 3. Branch: **`main`**.
-4. Amplify should auto-detect **Next.js SSR**. The repo includes `amplify.yml` for Prisma and env wiring.
+4. Amplify should auto-detect **Next.js SSR**. The repo includes `amplify.yml` for environment wiring.
 
 ## 2. Add environment variables
 
@@ -21,8 +21,8 @@ In **Amplify → App settings → Environment variables**, add every variable be
 | `NODE_ENV` | `production` |
 | `LOCAL_MOCK_MODE` | `false` |
 | `LOCAL_AUTH_ENABLED` | `false` |
-| `DATABASE_URL` | Supabase **transaction pooler** (port `6543`, `?pgbouncer=true`) |
-| `DIRECT_URL` | Supabase **session pooler** (port `5432`) |
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase server-side service-role key |
 | `AUTH_SECRET` | Random string, at least 32 characters |
 | `OPENAI_API_KEY` | Your OpenAI API key |
 | `OPENAI_VECTOR_STORE_ID` | Your vector store ID |
@@ -54,10 +54,8 @@ Register redirect URI: `https://helper.highlands.io/api/auth/callback/microsoft-
 On push to `main`, Amplify runs:
 
 1. `npm ci`
-2. `npx prisma generate`
-3. `npm run db:migrate:deploy` (applies schema to Supabase)
-4. Writes server env to `.env.production`
-5. `npm run build`
+2. Writes server env to `.env.production`
+3. `npm run build`
 
 After deploy, verify:
 
@@ -132,15 +130,15 @@ npm run sync
 
 Point local `.env` at production Supabase + OpenAI, or trigger **Admin → Run full sync** and monitor logs.
 
-## 7. Skip Supabase GitHub integration
+## 7. Apply Supabase migrations before deployment
 
-Do **not** enable Supabase’s GitHub migration integration for this app. Schema changes are managed with **Prisma** (`prisma/migrations/`), applied during the Amplify build via `db:migrate:deploy`.
+Apply reviewed SQL files from [supabase/migrations](../supabase/migrations) with the Supabase CLI or SQL Editor. Amplify does not apply database migrations during application builds.
 
 ## Troubleshooting
 
 | Issue | Fix |
 | ----- | --- |
 | Build fails on env validation | Confirm all required Amplify env vars are set (see section 2). |
-| Build fails on `db:migrate:deploy` | Check `DIRECT_URL` uses the pooler host on port `5432`. |
+| App cannot access data | Confirm `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are configured in Amplify. |
 | App loads but APIs fail | Confirm `.env.production` vars were written — redeploy after fixing Amplify env vars. |
 | Sync fails in production | Run sync locally; see Playwright note in section 5. |

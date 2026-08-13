@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { dbError, getDb } from "@/lib/db";
 import { validateAndCreateSource } from "@/lib/sync/service";
 
 export async function GET() {
   try {
     await requireAdmin();
-    const sources = await prisma.knowledgeSource.findMany({
-      orderBy: { updatedAt: "desc" },
-    });
+    const { data: sources, error } = await getDb().from("KnowledgeSource").select("*").order("updatedAt", { ascending: false });
+    if (error) dbError(error, "Unable to load sources");
     return NextResponse.json(sources);
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {

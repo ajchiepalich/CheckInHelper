@@ -1,4 +1,4 @@
-import { UserRole } from "@prisma/client";
+import type { UserRole } from "@/lib/db";
 
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 

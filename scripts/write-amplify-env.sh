@@ -7,8 +7,8 @@ set -euo pipefail
 required=(
   APP_URL
   AUTH_SECRET
-  DATABASE_URL
-  DIRECT_URL
+  SUPABASE_URL
+  SUPABASE_SERVICE_ROLE_KEY
   OPENAI_API_KEY
   OPENAI_VECTOR_STORE_ID
   ATLASSIAN_BASE_URL
@@ -36,8 +36,8 @@ write_env() {
 
 write_env APP_URL
 write_env AUTH_SECRET
-write_env DATABASE_URL
-write_env DIRECT_URL
+write_env SUPABASE_URL
+write_env SUPABASE_SERVICE_ROLE_KEY
 write_env OPENAI_API_KEY
 write_env OPENAI_VECTOR_STORE_ID
 write_env ATLASSIAN_BASE_URL

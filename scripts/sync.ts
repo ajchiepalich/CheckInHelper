@@ -1,5 +1,5 @@
 #!/usr/bin/env tsx
-import { SyncTriggerType } from "@prisma/client";
+import { SyncTriggerType } from "../src/lib/db";
 import { runSynchronization } from "../src/lib/sync/service";
 
 async function main() {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { KnowledgeSource } from "@prisma/client";
+import type { KnowledgeSource } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
