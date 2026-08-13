@@ -78,6 +78,8 @@ export type AppEnv = z.infer<typeof envSchema>;
 
 const BUILD_PLACEHOLDER_DATABASE_URL =
   "postgresql://build:build@127.0.0.1:5432/build?schema=public";
+const BUILD_PLACEHOLDER_DIRECT_URL =
+  "postgresql://build:build@127.0.0.1:5432/build?schema=public";
 const BUILD_PLACEHOLDER_AUTH_SECRET =
   "build-time-placeholder-secret-minimum-32-characters";
 
@@ -94,6 +96,7 @@ function getEnvSource(): NodeJS.ProcessEnv {
     ...process.env,
     DATABASE_URL:
       process.env.DATABASE_URL ?? BUILD_PLACEHOLDER_DATABASE_URL,
+    DIRECT_URL: process.env.DIRECT_URL ?? BUILD_PLACEHOLDER_DIRECT_URL,
     AUTH_SECRET: process.env.AUTH_SECRET ?? BUILD_PLACEHOLDER_AUTH_SECRET,
   };
 }

@@ -11,15 +11,30 @@ Production-ready internal AI documentation assistant for Church of the Highlands
 - Atlassian Confluence Cloud REST API
 - Vitest + Playwright
 
-## Quick start (local mock mode)
+## Quick start
 
-Local mock mode runs without OpenAI or Confluence credentials.
+### Supabase (recommended)
+
+1. Create a Supabase project and copy the **transaction pooler** and **direct** connection strings.
+2. Configure `.env` (see [docs/supabase.md](./docs/supabase.md)).
+3. Run:
 
 ```bash
 cp .env.example .env
-docker compose up -d
 npm install
-npm run db:push
+npm run db:migrate:deploy
+npm run dev
+```
+
+### Local mock mode (no OpenAI or Confluence)
+
+Set `LOCAL_MOCK_MODE=true` in `.env`. You still need a database (Supabase or Docker).
+
+```bash
+cp .env.example .env
+docker compose up -d   # optional if using local Postgres instead of Supabase
+npm install
+npm run db:migrate:deploy
 npm run db:seed
 npm run dev
 ```
@@ -47,7 +62,8 @@ Open [http://localhost:3000/login](http://localhost:3000/login) and sign in with
 
 See [`.env.example`](./.env.example). Required for production:
 
-- `DATABASE_URL`
+- `DATABASE_URL` — Supabase transaction pooler (or direct Postgres URL)
+- `DIRECT_URL` — Supabase direct connection (Prisma migrations)
 - `AUTH_SECRET`
 - `ENTRA_CLIENT_ID`, `ENTRA_CLIENT_SECRET`, `ENTRA_TENANT_ID`
 - `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_VECTOR_STORE_ID`
@@ -92,7 +108,7 @@ curl -X GET "$APP_URL/api/cron/sync" \
 
 ## Architecture
 
-See [`docs/architecture.md`](./docs/architecture.md), [`docs/synchronization.md`](./docs/synchronization.md), and [`docs/security.md`](./docs/security.md).
+See [`docs/architecture.md`](./docs/architecture.md), [`docs/supabase.md`](./docs/supabase.md), [`docs/amplify.md`](./docs/amplify.md), [`docs/synchronization.md`](./docs/synchronization.md), and [`docs/security.md`](./docs/security.md).
 
 ## Routes
 
@@ -110,20 +126,28 @@ See [`docs/architecture.md`](./docs/architecture.md), [`docs/synchronization.md`
 | `/api/cron/sync`  | Scheduled sync       |
 | `/api/health`     | Health check         |
 
-## Deployment (Vercel)
+## Deployment (AWS Amplify + Supabase)
 
-1. Provision PostgreSQL (Neon, Supabase, RDS, etc.).
-2. Configure environment variables in Vercel.
-3. Deploy the app and run `npm run db:migrate:deploy`.
-4. Configure Entra redirect URI: `https://your-app.example.com/api/auth/callback/microsoft-entra-id`.
-5. Configure nightly cron with `CRON_SECRET`.
+Production: **https://helper.highlands.io**
+
+1. Connect the **`highlands`** GitHub repo in Amplify (branch `main`).
+2. Add environment variables in Amplify Console (see [docs/amplify.md](./docs/amplify.md)).
+3. Point custom domain **`helper.highlands.io`** at the Amplify app.
+4. Deploy — `amplify.yml` runs Prisma migrations against Supabase during build.
+5. Register Confluence sources and run sync (see [docs/amplify.md](./docs/amplify.md)).
+
+Full walkthrough: [docs/amplify.md](./docs/amplify.md) and [docs/supabase.md](./docs/supabase.md).
+
+## Deployment (Vercel, optional)
+
+If deploying to Vercel instead:
 
 ## Remaining setup for production
 
 - Microsoft Entra app registration and role assignment strategy
 - Real Confluence service account and approved page list
 - OpenAI vector store provisioning
-- Production PostgreSQL and secret management
+- Production Supabase project and secret management
 - Optional: enable parent/descendant and label-based source traversal
 
 ## License

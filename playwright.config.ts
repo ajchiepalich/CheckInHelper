@@ -21,6 +21,8 @@ export default defineConfig({
       LOCAL_MOCK_MODE: "true",
       DATABASE_URL:
         "postgresql://highlands:highlands_dev@localhost:5432/highlands_docs",
+      DIRECT_URL:
+        "postgresql://highlands:highlands_dev@localhost:5432/highlands_docs",
       AUTH_SECRET: "playwright-test-secret-minimum-32-chars",
       APP_URL: "http://localhost:3000",
     },

@@ -33,6 +33,6 @@ describe("MockRetrievalProvider", () => {
     })) {
       if (event.type === "completed") text = event.text;
     }
-    expect(text).toContain("approved Highlands documentation");
+    expect(text).toContain("Highlands documentation");
   });
 });

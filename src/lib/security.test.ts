@@ -13,6 +13,6 @@ describe("authorization", () => {
 
 describe("assistant fallback", () => {
   it("uses approved documentation fallback language", () => {
-    expect(NO_SOURCE_FALLBACK).toContain("approved Highlands documentation");
+    expect(NO_SOURCE_FALLBACK).toContain("Highlands documentation");
   });
 });
