@@ -4,6 +4,9 @@ import { AppProviders } from "@/components/providers/app-providers";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { getEnv, isLocalMockMode } from "@/lib/env";
 
+// Authenticated pages query Supabase through Prisma and must not run at build time.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Highlands Documentation Assistant",
   description:
