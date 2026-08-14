@@ -5,7 +5,7 @@ test.describe("Highlands documentation assistant", () => {
     await page.goto("/chat");
 
     await page.getByText("How do I request technology support?").click();
-    await expect(page.getByText("Documentation assistant")).toBeVisible();
+    await expect(page.getByText("Helper")).toBeVisible();
     await expect(
       page.getByText("technology support", { exact: false }),
     ).toBeVisible({

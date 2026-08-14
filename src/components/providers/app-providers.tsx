@@ -10,9 +10,9 @@ export function AppProviders({
   mockMode: boolean;
 }) {
   return (
-    <>
+    <div className="flex h-dvh flex-col overflow-hidden">
       {mockMode ? <MockModeBanner /> : null}
-      {children}
-    </>
+      <div className="min-h-0 flex-1">{children}</div>
+    </div>
   );
 }
