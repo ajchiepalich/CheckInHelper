@@ -14,6 +14,9 @@ const LOGO_SRC = "/helper-mark.png";
  * Structural pieces (matched to Helper mark geometry):
  * - OUTER: largest caret / A shell → becomes arrowhead
  * - RIBS: three inner diagonals → collapse into vertical shaft
+ *
+ * Paths are set via the SVG `d` attribute (not CSS `d: path()`),
+ * which Safari / iOS Chrome do not support — that left a blank circle.
  */
 const OUTER = {
   idle: "M8.2 23.5 C9.5 16.5 13.0 10.2 16.5 6.8 C18.9 9.8 21.4 14.0 23.0 17.4",
@@ -35,30 +38,26 @@ const RIBS = [
   },
 ] as const;
 
-function cssPath(d: string): React.CSSProperties {
-  return { d: `path("${d}")` };
-}
-
 function MorphGlyph({ send }: { send: boolean }) {
   return (
     <svg
       viewBox="0 0 32 32"
-      className="size-5 overflow-visible text-[#A5D7F4]"
+      className={cn(
+        "size-5 overflow-visible text-[#A5D7F4] transition-transform duration-200 ease-out",
+        send ? "scale-100" : "scale-90",
+      )}
       fill="none"
       aria-hidden="true"
     >
       <path
         className="composer-morph-stroke composer-morph-stroke--outer"
-        style={cssPath(send ? OUTER.send : OUTER.idle)}
+        d={send ? OUTER.send : OUTER.idle}
       />
       {RIBS.map((rib, index) => (
         <path
           key={index}
           className="composer-morph-stroke composer-morph-stroke--rib"
-          style={{
-            ...cssPath(send ? rib.send : rib.idle),
-            transitionDelay: `${24 + index * 20}ms`,
-          }}
+          d={send ? rib.send : rib.idle}
         />
       ))}
     </svg>
@@ -88,15 +87,14 @@ function BrandMorphIcon({
         src={LOGO_SRC}
         alt=""
         className={cn(
-          "absolute inset-0 size-full object-cover transition-opacity duration-100 ease-in-out",
+          "absolute inset-0 size-full object-cover transition-opacity duration-150 ease-out",
           send ? "opacity-0" : "opacity-100",
         )}
       />
 
-      {/* Always mounted so path `d` can interpolate idle ↔ send */}
       <span
         className={cn(
-          "relative z-[1] flex items-center justify-center transition-opacity duration-100 ease-in-out",
+          "relative z-[1] flex items-center justify-center transition-opacity duration-150 ease-out",
           send ? "opacity-100" : "opacity-0",
         )}
       >
@@ -138,7 +136,8 @@ function RiveMorphIcon({
 }
 
 /**
- * Idle = exact Helper mark. Typing morphs caret→arrowhead, ribs→shaft.
+ * Idle = exact Helper mark. Typing swaps to send arrow via SVG `d` + fade
+ * (CSS path morph is unsupported on Safari / many mobile browsers).
  */
 export function ComposerActionIcon({
   state,

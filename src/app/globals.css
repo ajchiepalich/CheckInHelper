@@ -215,7 +215,6 @@ select:focus-visible {
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  transition: d 260ms ease-in-out;
 }
 
 .composer-morph-stroke--outer {
@@ -259,9 +258,3 @@ select:focus-visible {
   );
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .composer-morph-stroke {
-    transition: none !important;
-    transition-delay: 0ms !important;
-  }
-}
