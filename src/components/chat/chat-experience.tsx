@@ -58,8 +58,9 @@ export function ChatExperience({
   function resizeComposer() {
     const el = textareaRef.current;
     if (!el) return;
-    el.style.height = "0px";
-    el.style.height = `${Math.min(Math.max(el.scrollHeight, 28), 160)}px`;
+    // Match the 40px send button on a single line so items-end is visually centered.
+    el.style.height = "40px";
+    el.style.height = `${Math.min(Math.max(el.scrollHeight, 40), 160)}px`;
   }
 
   useEffect(() => {
@@ -399,7 +400,7 @@ export function ChatExperience({
     >
       <div
         className={cn(
-          "composer-glass flex min-h-[56px] w-full items-end gap-1 rounded-[30px] border border-white/25 p-1.5",
+          "composer-glass flex min-h-[52px] w-full items-end gap-1 rounded-[30px] border border-white/25 p-1.5",
           "shadow-[0_8px_28px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.35)]",
           "dark:border-white/12 dark:shadow-[0_8px_28px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.14)]",
         )}
@@ -415,7 +416,7 @@ export function ChatExperience({
           placeholder="Ask Helper"
           rows={1}
           disabled={isStreaming}
-          className="max-h-40 min-h-[28px] flex-1 resize-none overflow-y-auto border-0 bg-transparent px-3 py-[10px] text-base leading-6 text-[var(--color-foreground)] caret-[#007AFF] shadow-none outline-none ring-0 placeholder:text-[var(--color-muted)]/70 focus:border-0 focus:outline-none focus:ring-0 focus-visible:border-0 focus-visible:outline-none focus-visible:ring-0"
+          className="max-h-40 min-h-10 flex-1 resize-none overflow-y-auto border-0 bg-transparent px-3 py-2 text-base leading-6 text-[var(--color-foreground)] caret-[#007AFF] shadow-none outline-none ring-0 placeholder:text-[var(--color-muted)]/70 focus:border-0 focus:outline-none focus:ring-0 focus-visible:border-0 focus-visible:outline-none focus-visible:ring-0"
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -431,7 +432,7 @@ export function ChatExperience({
           aria-label={hasInput ? "Send message" : "Ask Helper"}
           disabled={!hasInput || isStreaming}
           className={cn(
-            "size-10 shrink-0 overflow-hidden rounded-full bg-[#06354B] p-0 text-[#A5D7F4] hover:bg-[#052c3f] focus-visible:ring-[#06354B]",
+            "size-10 shrink-0 self-end overflow-hidden rounded-full bg-[#06354B] p-0 text-[#A5D7F4] hover:bg-[#052c3f] focus-visible:ring-[#06354B]",
             !hasInput && "disabled:opacity-100",
           )}
         >
