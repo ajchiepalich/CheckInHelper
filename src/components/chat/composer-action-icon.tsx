@@ -1,22 +1,13 @@
-"use client";
-
-import { useEffect, useRef, useState } from "react";
-import { useRive, useStateMachineInput } from "@rive-app/react-canvas";
 import { cn } from "@/lib/utils";
 
 export type ComposerIconState = "idle" | "send";
 
-const STATE_MACHINE = "Composer";
-const RIVE_SRC = "/rive/composer-send.riv";
 const LOGO_SRC = "/helper-mark.png";
 
 /**
  * Structural pieces (matched to Helper mark geometry):
  * - OUTER: largest caret / A shell → becomes arrowhead
  * - RIBS: three inner diagonals → collapse into vertical shaft
- *
- * Paths are set via the SVG `d` attribute (not CSS `d: path()`),
- * which Safari / iOS Chrome do not support — that left a blank circle.
  */
 const OUTER = {
   idle: "M8.2 23.5 C9.5 16.5 13.0 10.2 16.5 6.8 C18.9 9.8 21.4 14.0 23.0 17.4",
@@ -42,10 +33,7 @@ function MorphGlyph({ send }: { send: boolean }) {
   return (
     <svg
       viewBox="0 0 32 32"
-      className={cn(
-        "size-5 overflow-visible text-[#A5D7F4] transition-transform duration-200 ease-out",
-        send ? "scale-100" : "scale-90",
-      )}
+      className="size-5 overflow-visible text-[#A5D7F4]"
       fill="none"
       aria-hidden="true"
     >
@@ -64,7 +52,11 @@ function MorphGlyph({ send }: { send: boolean }) {
   );
 }
 
-function BrandMorphIcon({
+/**
+ * Idle = exact Helper mark. Typing crossfades to the send glyph via opacity
+ * only — this control is hit on every keystroke.
+ */
+export function ComposerActionIcon({
   state,
   className,
 }: {
@@ -81,20 +73,19 @@ function BrandMorphIcon({
       )}
       aria-hidden="true"
     >
-      {/* Exact brand artwork for idle */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={LOGO_SRC}
         alt=""
         className={cn(
-          "absolute inset-0 size-full object-cover transition-opacity duration-150 ease-out",
+          "absolute inset-0 size-full object-cover transition-opacity duration-150 ease-in-out",
           send ? "opacity-0" : "opacity-100",
         )}
       />
 
       <span
         className={cn(
-          "relative z-[1] flex items-center justify-center transition-opacity duration-150 ease-out",
+          "relative z-[1] flex items-center justify-center transition-opacity duration-150 ease-in-out",
           send ? "opacity-100" : "opacity-0",
         )}
       >
@@ -102,78 +93,4 @@ function BrandMorphIcon({
       </span>
     </span>
   );
-}
-
-function RiveMorphIcon({
-  state,
-  className,
-  onUnavailable,
-}: {
-  state: ComposerIconState;
-  className?: string;
-  onUnavailable?: () => void;
-}) {
-  const { rive, RiveComponent } = useRive({
-    src: RIVE_SRC,
-    stateMachines: STATE_MACHINE,
-    autoplay: true,
-    onLoadError: () => onUnavailable?.(),
-  });
-
-  const sendInput = useStateMachineInput(rive, STATE_MACHINE, "send");
-
-  useEffect(() => {
-    if (!sendInput) return;
-    sendInput.value = state === "send";
-  }, [sendInput, state]);
-
-  return (
-    <RiveComponent
-      className={cn("size-full rounded-full", className)}
-      aria-hidden="true"
-    />
-  );
-}
-
-/**
- * Idle = exact Helper mark. Typing swaps to send arrow via SVG `d` + fade
- * (CSS path morph is unsupported on Safari / many mobile browsers).
- */
-export function ComposerActionIcon({
-  state,
-  className,
-}: {
-  state: ComposerIconState;
-  className?: string;
-}) {
-  const probed = useRef(false);
-  const [riveAvailable, setRiveAvailable] = useState(false);
-
-  useEffect(() => {
-    if (probed.current) return;
-    probed.current = true;
-    let cancelled = false;
-    fetch(RIVE_SRC, { method: "HEAD" })
-      .then((res) => {
-        if (!cancelled) setRiveAvailable(res.ok);
-      })
-      .catch(() => {
-        if (!cancelled) setRiveAvailable(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (riveAvailable) {
-    return (
-      <RiveMorphIcon
-        state={state}
-        className={className}
-        onUnavailable={() => setRiveAvailable(false)}
-      />
-    );
-  }
-
-  return <BrandMorphIcon state={state} className={className} />;
 }

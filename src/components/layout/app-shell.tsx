@@ -56,10 +56,10 @@ export function AppShell({
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                    "pressable flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-[transform,color,background-color] duration-[160ms] ease-out",
                     active
                       ? "bg-white/15 text-white"
-                      : "text-white/80 hover:bg-white/10 hover:text-white",
+                      : "text-white/80 hover-fine:bg-white/10 hover-fine:text-white",
                   )}
                 >
                   <Icon className="h-4 w-4" aria-hidden="true" />
@@ -107,7 +107,7 @@ export function AppShell({
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap",
+                    "pressable rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap",
                     pathname === item.href ||
                       pathname.startsWith(`${item.href}/`)
                       ? "bg-[var(--color-primary-dark)] text-white"

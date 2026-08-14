@@ -23,7 +23,7 @@ export function CitationCard({
       <div className="flex items-start justify-between gap-3">
         <button
           type="button"
-          className="min-w-0 flex-1 text-left"
+          className="pressable min-w-0 flex-1 text-left"
           onClick={() => onSelect?.(citation)}
         >
           <p className="font-semibold text-[var(--color-primary)]">
@@ -43,7 +43,7 @@ export function CitationCard({
           href={citation.sourceUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--color-accent-soft)] text-[var(--color-secondary)]"
+          className="pressable inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--color-accent-soft)] text-[var(--color-secondary)]"
           aria-label={`Open ${citation.title} in Confluence`}
         >
           <ExternalLink className="h-4 w-4" />

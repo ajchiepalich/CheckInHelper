@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function SyncPanel() {
-  const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function triggerSync(options?: {
@@ -13,7 +13,6 @@ export function SyncPanel() {
     retryFailedOnly?: boolean;
   }) {
     setLoading(true);
-    setMessage(null);
     const response = await fetch("/api/admin/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -21,9 +20,9 @@ export function SyncPanel() {
     });
     const data = await response.json();
     if (!response.ok) {
-      setMessage(data.error ?? "Sync failed.");
+      toast.error(data.error ?? "Sync failed.");
     } else {
-      setMessage(
+      toast.success(
         `Sync ${data.status}. Added ${data.summary.added}, updated ${data.summary.updated}, unchanged ${data.summary.unchanged}, failed ${data.summary.failed}.`,
       );
     }
@@ -53,9 +52,6 @@ export function SyncPanel() {
         >
           Retry failed
         </Button>
-        {message ? (
-          <p className="w-full text-sm text-[var(--color-muted)]">{message}</p>
-        ) : null}
       </CardContent>
     </Card>
   );

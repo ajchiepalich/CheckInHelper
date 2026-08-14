@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   Check,
   Loader2,
@@ -19,10 +19,17 @@ import {
 } from "@/components/chat/citation-card";
 import { Card } from "@/components/ui/card";
 import { ComposerActionIcon } from "@/components/chat/composer-action-icon";
+import {
+  SourceDetailsBody,
+  SourceDetailsSheet,
+} from "@/components/chat/source-details";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 type ChatMessage = {
   id: string;
+  /** Stable across server id swaps so mount entrance does not replay. */
+  stableKey: string;
   role: "user" | "assistant";
   content: string;
   citations?: CitationView[];
@@ -42,14 +49,14 @@ export function ChatExperience({
   const [input, setInput] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [selectedCitation, setSelectedCitation] = useState<CitationView | null>(
     null,
   );
+  const [sourceSheetOpen, setSourceSheetOpen] = useState(false);
   const [feedbackByMessage, setFeedbackByMessage] = useState<
-    Record<string, "confirming" | "hidden">
+    Record<string, "confirming" | "leaving" | "hidden">
   >({});
-  const feedbackHideTimers = useRef<Record<string, number>>({});
+  const feedbackHideTimers = useRef<Record<string, number[]>>({});
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -66,7 +73,9 @@ export function ChatExperience({
   useEffect(() => {
     const timers = feedbackHideTimers.current;
     return () => {
-      Object.values(timers).forEach((timer) => window.clearTimeout(timer));
+      Object.values(timers).forEach((ids) =>
+        ids.forEach((id) => window.clearTimeout(id)),
+      );
     };
   }, []);
 
@@ -75,19 +84,46 @@ export function ChatExperience({
   }, [input]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, status]);
+    const reduce = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    bottomRef.current?.scrollIntoView({
+      behavior: reduce || isStreaming ? "auto" : "smooth",
+    });
+  }, [messages, status, isStreaming]);
+
+  function selectCitation(citation: CitationView) {
+    setSelectedCitation(citation);
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      setSourceSheetOpen(true);
+    }
+  }
+
+  function clearFeedbackTimers(messageId?: string) {
+    if (messageId) {
+      (feedbackHideTimers.current[messageId] ?? []).forEach((id) =>
+        window.clearTimeout(id),
+      );
+      delete feedbackHideTimers.current[messageId];
+      return;
+    }
+    Object.values(feedbackHideTimers.current).forEach((ids) =>
+      ids.forEach((id) => window.clearTimeout(id)),
+    );
+    feedbackHideTimers.current = {};
+  }
 
   async function sendMessage(text: string) {
     const trimmed = text.trim();
     if (!trimmed || isStreaming) return;
 
-    setError(null);
     setIsStreaming(true);
     setStatus("Sending your question…");
 
+    const userKey = `local-user-${Date.now()}`;
     const userMessage: ChatMessage = {
-      id: `local-user-${Date.now()}`,
+      id: userKey,
+      stableKey: userKey,
       role: "user",
       content: trimmed,
     };
@@ -97,7 +133,13 @@ export function ChatExperience({
     const assistantId = `local-assistant-${Date.now()}`;
     setMessages((prev) => [
       ...prev,
-      { id: assistantId, role: "assistant", content: "", citations: [] },
+      {
+        id: assistantId,
+        stableKey: assistantId,
+        role: "assistant",
+        content: "",
+        citations: [],
+      },
     ]);
 
     try {
@@ -186,12 +228,14 @@ export function ChatExperience({
               ),
             );
           } else if (payload.type === "error") {
-            setError(payload.message ?? "Something went wrong.");
+            toast.error(payload.message ?? "Something went wrong.");
           }
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      toast.error(
+        err instanceof Error ? err.message : "Something went wrong.",
+      );
       setMessages((prev) => prev.filter((m) => m.id !== assistantId));
     } finally {
       setIsStreaming(false);
@@ -222,24 +266,23 @@ export function ChatExperience({
       // Keep the confirmation UI even if the request fails so the row still clears.
     }
 
-    if (feedbackHideTimers.current[messageId]) {
-      window.clearTimeout(feedbackHideTimers.current[messageId]);
-    }
-    feedbackHideTimers.current[messageId] = window.setTimeout(() => {
+    clearFeedbackTimers(messageId);
+    const leaveId = window.setTimeout(() => {
+      setFeedbackByMessage((prev) => ({ ...prev, [messageId]: "leaving" }));
+    }, 900);
+    const hideId = window.setTimeout(() => {
       setFeedbackByMessage((prev) => ({ ...prev, [messageId]: "hidden" }));
       delete feedbackHideTimers.current[messageId];
-    }, 1400);
+    }, 1100);
+    feedbackHideTimers.current[messageId] = [leaveId, hideId];
   }
 
   function startNewConversation() {
-    Object.values(feedbackHideTimers.current).forEach((timer) =>
-      window.clearTimeout(timer),
-    );
-    feedbackHideTimers.current = {};
+    clearFeedbackTimers();
     setConversationId(undefined);
     setMessages([]);
     setSelectedCitation(null);
-    setError(null);
+    setSourceSheetOpen(false);
     setFeedbackByMessage({});
   }
 
@@ -252,15 +295,24 @@ export function ChatExperience({
           <div className="gradient-panel rounded-[1.75rem] p-8 text-white shadow-[var(--shadow-soft)] md:p-10">
             <h3 className="text-4xl font-bold md:text-5xl">How can I help?</h3>
             <div className="mt-8 grid gap-3 md:grid-cols-2">
-              {SUGGESTED_PROMPTS.map((prompt) => (
-                <button
+              {SUGGESTED_PROMPTS.map((prompt, index) => (
+                <div
                   key={prompt}
-                  type="button"
-                  onClick={() => sendMessage(prompt)}
-                  className="rounded-2xl bg-white/15 p-4 text-left text-sm font-medium backdrop-blur transition hover:bg-white/25"
+                  className="suggested-prompt-enter"
+                  style={
+                    {
+                      "--stagger-index": index,
+                    } as CSSProperties
+                  }
                 >
-                  {prompt}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => sendMessage(prompt)}
+                    className="pressable w-full rounded-2xl bg-white/15 p-4 text-left text-sm font-medium backdrop-blur transition-[background-color,transform] duration-[160ms] ease-out hover-fine:bg-white/25"
+                  >
+                    {prompt}
+                  </button>
+                </div>
               ))}
             </div>
           </div>
@@ -269,7 +321,7 @@ export function ChatExperience({
         <div className="space-y-6">
           {messages.map((message) => (
             <article
-              key={message.id}
+              key={message.stableKey}
               aria-live={
                 message.role === "assistant" && isStreaming
                   ? "polite"
@@ -277,8 +329,8 @@ export function ChatExperience({
               }
               className={
                 message.role === "user"
-                  ? "ml-auto w-fit max-w-[min(85%,36rem)]"
-                  : "max-w-4xl"
+                  ? "message-enter ml-auto w-fit max-w-[min(85%,36rem)]"
+                  : "message-enter max-w-4xl"
               }
             >
               {message.role === "user" ? (
@@ -304,7 +356,7 @@ export function ChatExperience({
                           <CitationCard
                             key={`${message.id}-${index}`}
                             citation={citation}
-                            onSelect={setSelectedCitation}
+                            onSelect={selectCitation}
                           />
                         ))}
                       </div>
@@ -314,9 +366,15 @@ export function ChatExperience({
                   {message.content &&
                   !message.id.startsWith("local-") &&
                   feedbackByMessage[message.id] !== "hidden" ? (
-                    feedbackByMessage[message.id] === "confirming" ? (
+                    feedbackByMessage[message.id] === "confirming" ||
+                    feedbackByMessage[message.id] === "leaving" ? (
                       <div
                         className="feedback-confirm mt-4 flex items-center gap-2 text-sm font-medium text-[var(--color-primary-dark)]"
+                        data-leaving={
+                          feedbackByMessage[message.id] === "leaving"
+                            ? ""
+                            : undefined
+                        }
                         role="status"
                         aria-live="polite"
                       >
@@ -330,7 +388,7 @@ export function ChatExperience({
                         <button
                           type="button"
                           aria-label="Helpful"
-                          className="rounded-md p-1 text-[var(--color-secondary)] transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-dark)]"
+                          className="pressable rounded-md p-1 text-[var(--color-secondary)] transition-opacity hover-fine:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-dark)]"
                           onClick={() =>
                             submitFeedback(message.id, "HELPFUL")
                           }
@@ -340,7 +398,7 @@ export function ChatExperience({
                         <button
                           type="button"
                           aria-label="Not helpful"
-                          className="rounded-md p-1 text-[var(--color-error)] transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-dark)]"
+                          className="pressable rounded-md p-1 text-[var(--color-error)] transition-opacity hover-fine:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-dark)]"
                           onClick={() =>
                             submitFeedback(message.id, "NOT_HELPFUL")
                           }
@@ -350,7 +408,7 @@ export function ChatExperience({
                         <button
                           type="button"
                           aria-label="Report incorrect"
-                          className="rounded-md p-1 text-[var(--color-gold)] transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-dark)]"
+                          className="pressable rounded-md p-1 text-[var(--color-gold)] transition-opacity hover-fine:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary-dark)]"
                           onClick={() =>
                             submitFeedback(message.id, "INCORRECT")
                           }
@@ -379,12 +437,6 @@ export function ChatExperience({
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
           {status}
         </p>
-      ) : null}
-
-      {error ? (
-        <Card className="mt-4 border-[var(--color-error)] bg-[var(--color-error-bg)] p-4 text-sm text-[var(--color-error)]">
-          {error}
-        </Card>
       ) : null}
     </>
   );
@@ -432,7 +484,7 @@ export function ChatExperience({
           aria-label={hasInput ? "Send message" : "Ask Helper"}
           disabled={!hasInput || isStreaming}
           className={cn(
-            "size-10 shrink-0 self-end overflow-hidden rounded-full bg-[#06354B] p-0 text-[#A5D7F4] hover:bg-[#052c3f] focus-visible:ring-[#06354B]",
+            "size-10 shrink-0 self-end overflow-hidden rounded-full bg-[#06354B] p-0 text-[#A5D7F4] hover-fine:bg-[#052c3f] focus-visible:ring-[#06354B]",
             !hasInput && "disabled:opacity-100",
           )}
         >
@@ -450,6 +502,7 @@ export function ChatExperience({
   );
 
   const chatContent = (
+    <>
     <div
       className={
         embedded
@@ -500,32 +553,17 @@ export function ChatExperience({
             <h3 className="text-lg font-semibold text-[var(--color-primary)]">
               Source details
             </h3>
-            {selectedCitation ? (
-              <div className="mt-4 space-y-3 text-sm">
-                <p className="font-semibold">{selectedCitation.title}</p>
-                <p className="text-[var(--color-muted)]">
-                  {selectedCitation.spaceKey
-                    ? `Space ${selectedCitation.spaceKey}`
-                    : "Confluence source"}
-                </p>
-                <a
-                  href={selectedCitation.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex font-medium text-[var(--color-secondary)] underline"
-                >
-                  Open in Confluence
-                </a>
-              </div>
-            ) : (
-              <p className="mt-4 text-sm text-[var(--color-muted)]">
-                Select a citation to preview the source details here.
-              </p>
-            )}
+            <SourceDetailsBody citation={selectedCitation} />
           </Card>
         </aside>
       ) : null}
     </div>
+      <SourceDetailsSheet
+        citation={selectedCitation}
+        open={sourceSheetOpen}
+        onOpenChange={setSourceSheetOpen}
+      />
+    </>
   );
 
   if (embedded) {

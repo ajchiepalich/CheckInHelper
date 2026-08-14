@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import type { KnowledgeSource } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
@@ -16,7 +17,6 @@ export function SourcesManager({
   const [sources, setSources] = useState(initialSources);
   const [pageIdOrUrl, setPageIdOrUrl] = useState("");
   const [category, setCategory] = useState("general");
-  const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function refreshSources() {
@@ -29,7 +29,6 @@ export function SourcesManager({
   async function addSource(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    setMessage(null);
     const response = await fetch("/api/admin/sources", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -42,10 +41,10 @@ export function SourcesManager({
     });
     const data = await response.json();
     if (!response.ok) {
-      setMessage(data.error ?? "Unable to add source.");
+      toast.error(data.error ?? "Unable to add source.");
     } else {
       setPageIdOrUrl("");
-      setMessage("Source added successfully.");
+      toast.success("Source added successfully.");
       await refreshSources();
     }
     setLoading(false);
@@ -61,16 +60,18 @@ export function SourcesManager({
   }
 
   async function syncSource(id: string) {
-    setMessage("Sync started…");
+    toast.message("Sync started…");
     const response = await fetch("/api/admin/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sourceId: id }),
     });
     const data = await response.json();
-    setMessage(
-      response.ok ? `Sync finished with status ${data.status}.` : data.error,
-    );
+    if (response.ok) {
+      toast.success(`Sync finished with status ${data.status}.`);
+    } else {
+      toast.error(data.error ?? "Sync failed.");
+    }
     await refreshSources();
   }
 
@@ -111,9 +112,6 @@ export function SourcesManager({
               </Button>
             </div>
           </form>
-          {message ? (
-            <p className="mt-4 text-sm text-[var(--color-muted)]">{message}</p>
-          ) : null}
           <p className="mt-4 text-sm text-[var(--color-muted)]">
             Sources must be publicly accessible Confluence pages. The app fetches
             content anonymously through the Confluence REST API and does not use
