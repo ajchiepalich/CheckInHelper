@@ -12,10 +12,9 @@ test.describe("Highlands documentation assistant", () => {
       timeout: 15000,
     });
 
-    await expect(page.getByText("Requesting Technology Support")).toBeVisible();
-    const citationLink = page.getByLabel(
-      "Open Requesting Technology Support in Confluence",
-    );
+    const citationLink = page.getByRole("link", {
+      name: "Requesting Technology Support",
+    });
     await expect(citationLink).toBeVisible();
 
     await page.getByRole("button", { name: "Helpful" }).click();

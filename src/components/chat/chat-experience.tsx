@@ -13,15 +13,8 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import { MarkdownContent } from "@/components/chat/markdown-content";
-import {
-  CitationCard,
-  type CitationView,
-} from "@/components/chat/citation-card";
+import type { CitationView } from "@/components/chat/citation-card";
 import { ComposerActionIcon } from "@/components/chat/composer-action-icon";
-import {
-  SourceDetailsBody,
-  SourceDetailsSheet,
-} from "@/components/chat/source-details";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -48,10 +41,6 @@ export function ChatExperience({
   const [input, setInput] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [selectedCitation, setSelectedCitation] = useState<CitationView | null>(
-    null,
-  );
-  const [sourceSheetOpen, setSourceSheetOpen] = useState(false);
   const [feedbackByMessage, setFeedbackByMessage] = useState<
     Record<string, "confirming" | "leaving" | "hidden">
   >({});
@@ -90,13 +79,6 @@ export function ChatExperience({
       behavior: reduce || isStreaming ? "auto" : "smooth",
     });
   }, [messages, status, isStreaming]);
-
-  function selectCitation(citation: CitationView) {
-    setSelectedCitation(citation);
-    if (window.matchMedia("(max-width: 1023px)").matches) {
-      setSourceSheetOpen(true);
-    }
-  }
 
   function clearFeedbackTimers(messageId?: string) {
     if (messageId) {
@@ -280,13 +262,10 @@ export function ChatExperience({
     clearFeedbackTimers();
     setConversationId(undefined);
     setMessages([]);
-    setSelectedCitation(null);
-    setSourceSheetOpen(false);
     setFeedbackByMessage({});
   }
 
   const showEmptyState = messages.length === 0;
-  const showSourcePanel = !embedded && selectedCitation !== null;
 
   const thread = (
     <>
@@ -345,23 +324,6 @@ export function ChatExperience({
                     Helper
                   </p>
                   <MarkdownContent content={message.content || "…"} />
-
-                  {message.citations && message.citations.length > 0 ? (
-                    <div className="mt-5 space-y-3">
-                      <h4 className="text-sm font-semibold text-[var(--color-primary)]">
-                        Sources
-                      </h4>
-                      <div className="grid gap-3">
-                        {message.citations.map((citation, index) => (
-                          <CitationCard
-                            key={`${message.id}-${index}`}
-                            citation={citation}
-                            onSelect={selectCitation}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
 
                   {message.content &&
                   !message.id.startsWith("local-") &&
@@ -508,12 +470,7 @@ export function ChatExperience({
     <div
       className={cn(
         "h-full min-h-0 flex-1",
-        embedded
-          ? "mx-auto flex w-full max-w-4xl flex-col"
-          : cn(
-              "grid grid-rows-[minmax(0,1fr)]",
-              showSourcePanel && "gap-0 lg:grid-cols-[minmax(0,1fr)_320px]",
-            ),
+        embedded ? "mx-auto flex w-full max-w-4xl flex-col" : "flex flex-col",
       )}
     >
       <section
@@ -553,26 +510,7 @@ export function ChatExperience({
           {composer}
         </div>
       </section>
-
-      {showSourcePanel ? (
-        <aside
-          aria-label="Selected source details"
-          className="hidden h-full min-h-0 overflow-y-auto border-l border-[var(--color-border)] bg-[var(--color-surface-muted)]/40 lg:block"
-        >
-          <div className="sticky top-0 p-6">
-            <h3 className="text-lg font-semibold text-[var(--color-primary)]">
-              Source details
-            </h3>
-            <SourceDetailsBody citation={selectedCitation} />
-          </div>
-        </aside>
-      ) : null}
     </div>
-      <SourceDetailsSheet
-        citation={selectedCitation}
-        open={sourceSheetOpen}
-        onOpenChange={setSourceSheetOpen}
-      />
     </>
   );
 

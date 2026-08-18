@@ -192,9 +192,47 @@ select:focus-visible {
 
 .prose-highlands h1,
 .prose-highlands h2,
-.prose-highlands h3 {
+.prose-highlands h3,
+.prose-highlands h4 {
   color: var(--color-primary);
   font-weight: 700;
+}
+
+.prose-highlands h3,
+.prose-highlands h4 {
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  font-size: 1.05em;
+}
+
+.prose-highlands strong {
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+.prose-highlands em {
+  font-style: italic;
+  color: var(--color-muted);
+}
+
+.prose-highlands ul,
+.prose-highlands ol {
+  margin-top: 0.75em;
+  padding-left: 1.35em;
+}
+
+.prose-highlands li + li {
+  margin-top: 0.35em;
+}
+
+.prose-highlands li::marker {
+  color: var(--color-secondary);
+}
+
+.prose-highlands hr {
+  margin: 1.75em 0;
+  border: 0;
+  border-top: 1px solid var(--color-border);
 }
 
 .prose-highlands code {
