@@ -17,6 +17,7 @@
     "db:types": "supabase gen types typescript --linked > src/lib/database.types.ts",
     "sync": "tsx scripts/sync.ts",
     "add-source": "tsx scripts/add-source.ts",
+    "sources:bootstrap": "tsx scripts/bootstrap-sources.ts",
     "postinstall": ""
   },
   "dependencies": {

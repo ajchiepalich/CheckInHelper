@@ -70,9 +70,11 @@ Expected: `"status":"ok"`.
 The production Supabase database starts empty of real sources. From your machine (with production env vars or a local `.env` pointed at the same Supabase project):
 
 ```bash
-npm run add-source -- "https://churchofthehighlands.atlassian.net/wiki/external/ZDkyNjRlMWEyYmM2NGY4MmE5ZTA4NTliZWVmNGI2ZWM"
+npm run sources:bootstrap
 npm run sync
 ```
+
+Approved source URLs live in [`config/knowledge-sources.ts`](../config/knowledge-sources.ts). Add new pages there, then run the commands above from a machine with Playwright browsers installed (`npx playwright install chromium`).
 
 Or use **Admin → Sources** in the deployed app after it is live.
 
