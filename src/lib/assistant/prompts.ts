@@ -8,8 +8,12 @@ Rules:
 - When the approved documentation does not answer the question, say so directly.
 - Use plain, helpful language.
 - Provide concise answers first, followed by steps or detail when useful.
-- Do not include source attribution in your answer text. Never write sentences like "This information comes from...", "According to...", "Based on the documentation...", or similar closing source summaries.
-- Do not name, link to, or list source documents in the answer body. The application displays sources separately below your response.
+- Cite source documents with markdown links using each document's exact title, for example: [Safety & Security Notes](https://example.com/page).
+- Prefer placing the link at the end of the paragraph where that source's information appears.
+- When a response uses multiple sources, link each source at least once. Add a **Sources** section at the end for any sources not already linked inline.
+- Use only titles and URLs from the approved source list in these instructions.
+- Do not write plain-text attribution such as "This information comes from...", "According to...", or "Based on the documentation...".
+- Separate paragraphs and major sections with a blank line so the answer is easy to scan.
 - Distinguish documented facts from optional suggestions.
 - When sources conflict, explain the conflict and identify the pages involved.
 - Prefer the most recently updated approved source, but do not silently hide a conflict.
@@ -31,6 +35,66 @@ export const NO_SOURCE_FALLBACK =
 
 const SOURCE_ATTRIBUTION_SENTENCE =
   /^(this information comes from|according to|based on (?:the )?(?:approved )?|the (?:information|details|answer) (?:above )?(?:comes|is) from|this (?:answer )?(?:is )?based on|the source(?:s)? (?:for this )?(?:is|are))/i;
+
+export function buildInstructionsWithSources(
+  sources: Array<{ title: string; sourceUrl: string }>,
+): string {
+  if (sources.length === 0) return SYSTEM_PROMPT;
+
+  const catalog = sources
+    .map((source) => `- [${source.title}](${source.sourceUrl})`)
+    .join("\n");
+
+  return `${SYSTEM_PROMPT}
+
+Approved source documents:
+${catalog}`;
+}
+
+export function normalizeParagraphSpacing(text: string): string {
+  const normalized = text.replace(/\r\n/g, "\n").trimEnd();
+  if (!normalized) return normalized;
+
+  const withParagraphBreaks = normalized.replace(
+    /([.!?])\n(?!\n)(?=[A-Z*])/g,
+    "$1\n\n",
+  );
+
+  return withParagraphBreaks.replace(/\n{3,}/g, "\n\n");
+}
+
+export function appendSourceLinks(
+  text: string,
+  citations: Array<{ title: string; sourceUrl: string }>,
+): string {
+  if (citations.length === 0) return text;
+
+  const missing = citations.filter((citation) => {
+    const titlePattern = citation.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const linkedTitle = new RegExp(`\\[${titlePattern}\\]\\([^)]+\\)`).test(
+      text,
+    );
+    return !linkedTitle && !text.includes(citation.sourceUrl);
+  });
+
+  if (missing.length === 0) return text;
+
+  const links = missing
+    .map((citation) => `- [${citation.title}](${citation.sourceUrl})`)
+    .join("\n");
+
+  return `${text.trimEnd()}\n\n**Sources**\n\n${links}`;
+}
+
+export function formatAssistantAnswer(
+  text: string,
+  citations: Array<{ title: string; sourceUrl: string }>,
+): string {
+  let formatted = stripSourceAttributionFromAnswer(text);
+  formatted = normalizeParagraphSpacing(formatted);
+  formatted = appendSourceLinks(formatted, citations);
+  return formatted;
+}
 
 export function stripSourceAttributionFromAnswer(text: string): string {
   const paragraphs = text.trimEnd().split(/\n\n+/);

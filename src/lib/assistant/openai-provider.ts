@@ -10,10 +10,10 @@ import {
   shouldIncludeCitations,
 } from "@/lib/assistant/citations";
 import {
+  buildInstructionsWithSources,
   DEFAULT_RESPONSE_MAX_OUTPUT_TOKENS,
+  formatAssistantAnswer,
   NO_SOURCE_FALLBACK,
-  stripSourceAttributionFromAnswer,
-  SYSTEM_PROMPT,
 } from "@/lib/assistant/prompts";
 import type {
   RetrievalChatRequest,
@@ -47,6 +47,12 @@ export class OpenAIRetrievalProvider implements RetrievalProvider {
     if (error) dbError(error, "Unable to load indexed sources");
 
     const sourceMap = buildSourceFileMap(sources ?? []);
+    const instructions = buildInstructionsWithSources(
+      Array.from(sourceMap.values()).map((source) => ({
+        title: source.title,
+        sourceUrl: source.sourceUrl,
+      })),
+    );
 
     const input = request.messages.map((m) => ({
       role: m.role,
@@ -56,7 +62,7 @@ export class OpenAIRetrievalProvider implements RetrievalProvider {
     try {
       const stream = await this.client.responses.create({
         model: this.model,
-        instructions: SYSTEM_PROMPT,
+        instructions,
         input,
         stream: true,
         max_output_tokens: DEFAULT_RESPONSE_MAX_OUTPUT_TOKENS,
@@ -130,12 +136,12 @@ export class OpenAIRetrievalProvider implements RetrievalProvider {
         yield { type: "delta", text };
       }
 
-      text = stripSourceAttributionFromAnswer(text);
-
       const supportingCitations = shouldIncludeCitations(
         text,
         mapSupportingCitations(Array.from(citedFiles.values()), sourceMap),
       );
+
+      text = formatAssistantAnswer(text, supportingCitations);
 
       const diagnostics = buildRetrievalDiagnostics({
         traceId: request.traceId,

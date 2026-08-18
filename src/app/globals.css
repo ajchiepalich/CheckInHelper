@@ -171,6 +171,25 @@ select:focus-visible {
   color: var(--color-foreground);
 }
 
+.prose-highlands p + p,
+.prose-highlands ul + p,
+.prose-highlands ol + p,
+.prose-highlands p + ul,
+.prose-highlands p + ol {
+  margin-top: 1.25em;
+}
+
+.prose-highlands a {
+  color: var(--color-secondary);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.prose-highlands a:hover {
+  color: var(--color-primary);
+}
+
 .prose-highlands h1,
 .prose-highlands h2,
 .prose-highlands h3 {

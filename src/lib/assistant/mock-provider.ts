@@ -4,7 +4,7 @@ import type {
   RetrievalProvider,
   RetrievalStreamEvent,
 } from "@/lib/assistant/provider";
-import { NO_SOURCE_FALLBACK } from "@/lib/assistant/prompts";
+import { formatAssistantAnswer, NO_SOURCE_FALLBACK } from "@/lib/assistant/prompts";
 import { logInfo } from "@/lib/logger";
 
 const MOCK_RESPONSES: Record<
@@ -137,9 +137,11 @@ export class MockRetrievalProvider implements RetrievalProvider {
       citationCount: mock.citations.length,
     });
 
+    const formattedText = formatAssistantAnswer(mock.text, mock.citations);
+
     yield {
       type: "completed",
-      text: mock.text,
+      text: formattedText,
       openaiResponseId: `mock-${request.traceId}`,
       model: "mock-model",
       latencyMs,
