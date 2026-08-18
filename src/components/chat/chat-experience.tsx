@@ -17,7 +17,6 @@ import {
   CitationCard,
   type CitationView,
 } from "@/components/chat/citation-card";
-import { Card } from "@/components/ui/card";
 import { ComposerActionIcon } from "@/components/chat/composer-action-icon";
 import {
   SourceDetailsBody,
@@ -287,11 +286,12 @@ export function ChatExperience({
   }
 
   const showEmptyState = messages.length === 0;
+  const showSourcePanel = !embedded && selectedCitation !== null;
 
   const thread = (
     <>
       {showEmptyState ? (
-        <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col justify-center">
+        <div className="flex flex-1 flex-col justify-center">
           <div className="gradient-panel rounded-[1.75rem] p-8 text-white shadow-[var(--shadow-soft)] md:p-10">
             <h3 className="text-4xl font-bold md:text-5xl">How can I help?</h3>
             <div className="mt-8 grid gap-3 md:grid-cols-2">
@@ -318,7 +318,7 @@ export function ChatExperience({
           </div>
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="mx-auto w-full space-y-6">
           {messages.map((message) => (
             <article
               key={message.stableKey}
@@ -441,6 +441,8 @@ export function ChatExperience({
     </>
   );
 
+  const contentWidthClass = "mx-auto w-full max-w-4xl";
+
   const composer = (
     <form
       className="pointer-events-auto w-full"
@@ -504,18 +506,27 @@ export function ChatExperience({
   const chatContent = (
     <>
     <div
-      className={
+      className={cn(
+        "h-full min-h-0 flex-1",
         embedded
-          ? "mx-auto flex h-full min-h-0 w-full max-w-4xl flex-1 flex-col"
-          : "grid h-full min-h-0 flex-1 grid-rows-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_320px]"
-      }
+          ? "mx-auto flex w-full max-w-4xl flex-col"
+          : cn(
+              "grid grid-rows-[minmax(0,1fr)]",
+              showSourcePanel && "gap-0 lg:grid-cols-[minmax(0,1fr)_320px]",
+            ),
+      )}
     >
       <section
         aria-label="Conversation"
         className="relative flex h-full min-h-0 flex-col overflow-hidden"
       >
         {!embedded ? (
-          <div className="absolute top-4 right-4 z-20 md:top-6 md:right-0">
+          <div
+            className={cn(
+              "flex shrink-0 justify-end px-4 pt-4 md:px-0 md:pt-6",
+              contentWidthClass,
+            )}
+          >
             <Button variant="outline" onClick={startNewConversation}>
               New conversation
             </Button>
@@ -523,38 +534,37 @@ export function ChatExperience({
         ) : null}
 
         <div
-          className={
-            embedded
-              ? "flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-4 pb-28"
-              : "flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-16 pb-28 md:px-0 md:pt-6"
-          }
+          className={cn(
+            "flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-28 md:px-0",
+            embedded ? "pt-4" : showEmptyState ? "pt-2" : "pt-4",
+            !embedded && contentWidthClass,
+          )}
         >
           {thread}
         </div>
 
         {/* Overlay dock so thread paints under the glass for backdrop-filter */}
         <div
-          className={
-            embedded
-              ? "pointer-events-none absolute inset-x-0 bottom-0 z-40 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-6"
-              : "pointer-events-none absolute inset-x-0 bottom-0 z-40 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-6 md:px-0"
-          }
+          className={cn(
+            "pointer-events-none absolute inset-x-0 bottom-0 z-40 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-6 md:px-0",
+            !embedded && contentWidthClass,
+          )}
         >
           {composer}
         </div>
       </section>
 
-      {!embedded ? (
+      {showSourcePanel ? (
         <aside
           aria-label="Selected source details"
-          className="hidden h-full min-h-0 overflow-y-auto py-6 lg:block"
+          className="hidden h-full min-h-0 overflow-y-auto border-l border-[var(--color-border)] bg-[var(--color-surface-muted)]/40 lg:block"
         >
-          <Card className="sticky top-6 p-6">
+          <div className="sticky top-0 p-6">
             <h3 className="text-lg font-semibold text-[var(--color-primary)]">
               Source details
             </h3>
             <SourceDetailsBody citation={selectedCitation} />
-          </Card>
+          </div>
         </aside>
       ) : null}
     </div>
